@@ -50,7 +50,8 @@ let read_word = p_space p_token
 (* VALUES PARSE *)
 let check test str =
   try test str |> fun _ -> true with
-  | _ -> false
+  | Failure _ -> false
+  | Invalid_argument _ -> false
 ;;
 
 let p_integer =
@@ -98,8 +99,7 @@ let p_name =
 (* TYPES PARSE *)
 let p_q = space *> char '?' *> return true <|> return false
 
-let base_converter str =
-  match str with
+let base_converter = function
   | "bool" -> return TBool
   | "int" -> return TInt
   | "char" -> return TChar
@@ -275,24 +275,24 @@ let e_method =
     p_body
 ;;
 
-let parse p str =
-  match Angstrom.parse_string p ~consume:Angstrom.Consume.Prefix str with
+let parse p str = Angstrom.parse_string p ~consume:Angstrom.Consume.Prefix str
+
+let parse_to_some p str =
+  match parse p str with
   | Ok x -> Some x
   | Error _ -> None
 ;;
-
-let parse1 p str = Angstrom.parse_string p ~consume:Angstrom.Consume.Prefix str
 
 let show_wrap form = function
   | Some x -> Format.printf "%a@\n" form x
   | _ -> Format.print_string "Some error during parsing\n"
 ;;
 
-let print_pars ps pp str = show_wrap pp (parse ps str)
+let print_pars ps pp str = show_wrap pp (parse_to_some ps str)
 
 (* ---------------------------TESTS--------------------------- *)
 let test eq p s r =
-  match parse p s with
+  match parse_to_some p s with
   | Some x -> eq x r
   | None -> false
 ;;

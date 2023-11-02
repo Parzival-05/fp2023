@@ -10,25 +10,28 @@ type value =
   | NULL (** Null value*)
 [@@deriving show { with_path = false }, eq]
 
+type ref_type =
+  | TString
+  | TClass
+  | TInterface
+[@@deriving show { with_path = false }, eq]
+
+type base_type =
+  | TInt
+  | TChar
+  | TBool
+[@@deriving show { with_path = false }, eq]
+
+type not_nullable_type =
+  | TBase of base_type
+  | TRef of ref_type
+[@@deriving show { with_path = false }, eq]
+
 type types =
   | TNot_nullable_type of not_nullable_type
   | TNullable_type of base_type
   | TVoid (** type [void] for methods *)
 [@@deriving show { with_path = false }, eq]
-
-and base_type =
-  | TInt
-  | TChar
-  | TBool
-
-and ref_type =
-  | TString
-  | TClass
-  | TInterface
-
-and not_nullable_type =
-  | TBase of base_type
-  | TRef of ref_type
 
 type name = Name of string [@@deriving show { with_path = false }, eq]
 
@@ -99,4 +102,3 @@ and methods =
 and member =
   | CField of field
   | CMethod of methods
-(*TODO: | Constructor*)
