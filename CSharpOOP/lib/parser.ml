@@ -84,7 +84,7 @@ let p_null =
 
 let p_val =
   space *> choice [ p_bool; p_char; p_integer; p_string; p_null ]
-  >>= fun v -> return (Exp_Val v)
+  >>= fun v -> return (Exp_Const v)
 ;;
 
 let p_name =
@@ -129,8 +129,9 @@ let t_void =
   | _ -> fail "This is not a void"
 ;;
 
-let t_val = choice [ t_base_q; t_string ]
-let t_method = choice [ t_val; t_void ]
+let t_type = choice [ t_base_q; t_string ]
+let t_val = t_type >>| fun vt -> TVar vt
+let t_method = choice [ t_void; (t_type >>| fun mt -> TRetrun mt) ]
 
 (* EXPR PARSE *)
 let return_bin_op str binop =
@@ -190,14 +191,14 @@ let e_op =
     chainr1 expr assign)
 ;;
 
-let e_op_assign = lift3 (fun f a x -> a f x) e_name assign e_op
-let e_var_declaration = lift2 (fun t n -> Var_Declaration (t, n)) t_val p_name
-let skip_eq_run_op = read_str "=" *> e_op
+let expression = choice [ method_invoke e_op; e_op ]
+let e_op_assign = lift3 (fun f a x -> a f x) e_name assign expression
+let method_expr = choice [ e_op_assign; method_invoke e_op ] >>| fun i -> Expr i
 
-let e_assign =
-  lift2 (fun vd op -> Exp_Assign (vd, op)) e_var_declaration skip_eq_run_op
-  <|> e_var_declaration
-;;
+(* STATEMENTS PARSE*)
+let var_declaration = lift2 (fun t n -> Var_Declaration (t, n)) t_val p_name
+let skip_eq_run_op = read_str "=" *> e_op >>= (fun e -> return (Some e)) <|> return None
+let s_declaration = lift2 (fun vd op -> Decl (vd, op)) var_declaration skip_eq_run_op
 
 let p_return =
   read_word
@@ -213,32 +214,29 @@ let p_if_cond =
   | _ -> fail "This is not IF word"
 ;;
 
-let p_else expr e_ie =
-  read_str "else" *> (choice [ e_ie; expr ] >>= fun e -> return (Some e)) <|> return None
+let p_else body s_ie =
+  read_str "else" *> (choice [ s_ie; body ] >>= fun e -> return (Some e)) <|> return None
 ;;
 
-let e_if_else expr =
+let s_if_else body =
   fix (fun if_else ->
-    lift3 (fun i t e -> If_Else (i, t, e)) p_if_cond expr (p_else expr if_else))
+    lift3 (fun i t e -> If (i, t, e)) p_if_cond body (p_else body if_else))
 ;;
 
 let semicolon = fix (fun sem -> read_str ";" *> sem <|> return ())
 let semicolon1 = read_str ";" *> semicolon
 
 let p_body =
-  let read_body expr =
-    parens2 (many expr >>| (fun e -> Exp_Body e) <|> return (Exp_Body []))
-  in
+  let read_body expr = parens2 (many expr >>| (fun e -> Body e) <|> return (Body [])) in
   let e_choice b =
     choice
-      [ e_op_assign <* semicolon1
-      ; e_assign <* semicolon1
+      [ s_declaration <* semicolon1
+      ; method_expr <* semicolon1
       ; p_return <* semicolon1
-      ; method_invoke e_op <* semicolon1
-      ; e_if_else b <* semicolon
+      ; s_if_else b <* semicolon
       ]
   in
-  fix (fun body -> read_body @@ e_choice body)
+  fix (fun body -> read_body @@ e_choice body <* space)
 ;;
 
 let p_access_modifier = function
@@ -248,282 +246,116 @@ let p_access_modifier = function
   | _ -> fail "Is not an access modifier"
 ;;
 
-let p_m_modifier =
-  read_word
-  >>= fun str ->
-  match str with
-  | "static" -> return Static
-  | "override" -> return Override
-  | _ -> p_access_modifier str >>= fun m -> return (MAccess m)
+let modifier_list p = many p >>= fun l -> return (Some l) <|> return None
+
+let p_m_modifier_list =
+  let p_m_modifier =
+    read_word
+    >>= fun str ->
+    match str with
+    | "static" -> return Static
+    | "override" -> return Override
+    | _ -> p_access_modifier str >>= fun m -> return (MAccess m)
+  in
+  modifier_list p_m_modifier
 ;;
 
-let p_m_modifier_list = many p_m_modifier >>= fun l -> return (Some l) <|> return None
+let p_f_modifier_list =
+  let p_f_modifier =
+    read_word
+    >>= fun str ->
+    match str with
+    | "new" -> return New
+    | _ -> p_access_modifier str >>= fun m -> return (FAccess m)
+  in
+  modifier_list p_f_modifier
+;;
+
+let p_c_modifier_list =
+  let p_c_modifier = read_word >>= p_access_modifier >>= fun m -> return (CAccess m) in
+  modifier_list p_c_modifier
+;;
+
+let p_i_modifier_list =
+  read_word >>= p_access_modifier >>= (fun m -> return (Some (CAccess m))) <|> return None
+;;
 
 let p_m_name_args =
   lift2
     (fun n l -> n, l)
     p_name
-    (parens @@ p_list1 e_var_declaration "," >>| fun m -> Exp_Args m)
+    (parens @@ p_list1 var_declaration "," >>| fun m -> Params m)
 ;;
 
-let e_method =
-  lift4
-    (fun p i (d, o) r -> Method (p, i, d, o, r))
-    p_m_modifier_list
-    t_method
-    p_m_name_args
-    p_body
+let p_method =
+  lift3 (fun p i (d, o) -> Method (p, i, d, o)) p_m_modifier_list t_method p_m_name_args
 ;;
 
-let parse p str = Angstrom.parse_string p ~consume:Angstrom.Consume.Prefix str
+let c_method = lift2 (fun m b -> Method_Sign (m, b)) p_method p_body
+
+let assign_option =
+  p_space @@ (read_str "=" *> expression) >>= (fun x -> return (Some x)) <|> return None
+;;
+
+let p_field = lift3 (fun m t n -> Field (m, t, n)) p_f_modifier_list t_val p_name
+let c_field = lift2 (fun f e -> Field_Sign (f, e)) p_field assign_option
+
+let read_class_name =
+  read_word
+  >>= function
+  | "class" -> p_name
+  | _ -> fail "This is not a class"
+;;
+
+let class_members =
+  let member =
+    choice
+      [ c_field >>| (fun f -> CField f) <* semicolon1
+      ; c_method >>| (fun m -> CMethod m) <* semicolon
+      ]
+  in
+  parens2 @@ (many member <|> return []) <* space
+;;
+
+let p_class =
+  lift3 (fun m n mem -> Class (m, n, mem)) p_c_modifier_list read_class_name class_members
+;;
+
+let read_interface_name =
+  read_word
+  >>= function
+  | "interface" -> p_name
+  | _ -> fail "This is not a class"
+;;
+
+let intrface_members =
+  let member =
+    choice
+      [ p_field >>| (fun f -> IField f) <* semicolon1
+      ; p_method >>| (fun m -> IMethod m) <* semicolon
+      ]
+  in
+  parens2 @@ (many member <|> return []) <* space
+;;
+
+let p_interface =
+  lift3
+    (fun m n mem -> Interface (m, n, mem))
+    p_i_modifier_list
+    read_interface_name
+    intrface_members
+;;
+
+let p_ast =
+  let obj_choice = choice [ p_class; p_interface ] in
+  many obj_choice >>| (fun o -> Ast (Some o)) <|> return (Ast None)
+;;
+
+(* PARSERS *)
+let parse p str = Angstrom.parse_string p ~consume:Angstrom.Consume.All str
 
 let parse_to_some p str =
   match parse p str with
   | Ok x -> Some x
   | Error _ -> None
-;;
-
-let show_wrap form = function
-  | Some x -> Format.printf "%a@\n" form x
-  | _ -> Format.print_string "Some error during parsing\n"
-;;
-
-let print_pars ps pp str = show_wrap pp (parse_to_some ps str)
-
-(* ---------------------------TESTS--------------------------- *)
-let test eq p s r =
-  match parse_to_some p s with
-  | Some x -> eq x r
-  | None -> false
-;;
-
-(* number tests *)
-let%test "s" = test equal_value p_integer "10" (VInt 10)
-let%test "s" = test equal_value p_integer "1_2_3" (VInt 123)
-let%test "s" = not (test equal_value p_integer "10sss" (VInt 9))
-let%test "s" = not (test equal_value p_integer "ghk" (VInt 9))
-
-(* bool tests *)
-let%test "s" = test equal_value p_bool "true" (VBool true)
-let%test "s" = test equal_value p_bool "false" (VBool false)
-let%test "s" = not (test equal_value p_bool "true1" (VBool true))
-
-(* string tests *)
-let%test "s" = test equal_value p_string "\"hsjksda\"" (VString "hsjksda")
-let%test "s" = not (test equal_value p_string "4\"hsjksda\"" (VString "4hsjksda"))
-
-(* char tests *)
-let%test "s" = test equal_value p_char "\'a\'" (VChar 'a')
-let%test "s" = not (test equal_value p_char "\'ss\'" (VChar 's'))
-let%test "s" = not (test equal_value p_char "dd" (VChar 'd'))
-
-(* name tests *)
-let%test "s" = test equal_name p_name "Sring" (Name "Sring")
-let%test "s" = test equal_name p_name "_Sring" (Name "_Sring")
-let%test "s" = test equal_name p_name "sring" (Name "sring")
-let%test "s" = test equal_name p_name "s" (Name "s")
-let%test "s" = not (test equal_name p_name "1Sring" (Name "1Sring"))
-let%test "s" = not (test equal_name p_name "" (Name ""))
-let%test "s" = not (test equal_name p_name "if" (Name "if"))
-let%test "s" = test equal_name p_name "if1" (Name "if1")
-
-(* type tests *)
-let%test "s" = test equal_types t_val "string" (TNot_nullable_type (TRef TString))
-let%test "s" = test equal_types t_val "   int     ?" (TNullable_type TInt)
-let%test "s" = test equal_types t_val "   int   y" (TNot_nullable_type (TBase TInt))
-let%test "s" = not (test equal_types t_val "int11" (TNot_nullable_type (TBase TInt)))
-let%test "s" = not (test equal_types t_val "int?11" (TNot_nullable_type (TBase TInt)))
-let%test "s" = not (test equal_types t_val "     ybool        ?" (TNullable_type TBool))
-
-let%test "s" =
-  test
-    equal_expr
-    e_var_declaration
-    "   int  ?  name "
-    (Var_Declaration (TNullable_type TInt, Name "name"))
-;;
-
-let%test "s" =
-  test equal_expr e_op "1+2" (Bin_op (Plus, Exp_Val (VInt 1), Exp_Val (VInt 2)))
-;;
-
-let%test "s" =
-  test
-    equal_expr
-    e_op
-    "1+2*3"
-    (Bin_op (Plus, Exp_Val (VInt 1), Bin_op (Asterisk, Exp_Val (VInt 2), Exp_Val (VInt 3))))
-;;
-
-let%test "s" =
-  test
-    equal_expr
-    e_op
-    "( 1     +28)*   num   "
-    (Bin_op
-       ( Asterisk
-       , Bin_op (Plus, Exp_Val (VInt 1), Exp_Val (VInt 28))
-       , Exp_Name (Name "num") ))
-;;
-
-let%test "s" =
-  test
-    equal_expr
-    e_op
-    "1>=2 &&        3"
-    (Bin_op
-       (And, Bin_op (MoreOrEqual, Exp_Val (VInt 1), Exp_Val (VInt 2)), Exp_Val (VInt 3)))
-;;
-
-let%test "s" =
-  test
-    equal_expr
-    e_op
-    "  num1 = 1+2*3 / 9"
-    (Bin_op
-       ( Assign
-       , Exp_Name (Name "num1")
-       , Bin_op
-           ( Plus
-           , Exp_Val (VInt 1)
-           , Bin_op
-               ( Slash
-               , Bin_op (Asterisk, Exp_Val (VInt 2), Exp_Val (VInt 3))
-               , Exp_Val (VInt 9) ) ) ))
-;;
-
-let%test "s" =
-  test
-    equal_expr
-    e_assign
-    "   int  ?  name = (25 + 9) *  7"
-    (Exp_Assign
-       ( Var_Declaration (TNullable_type TInt, Name "name")
-       , Bin_op
-           (Asterisk, Bin_op (Plus, Exp_Val (VInt 25), Exp_Val (VInt 9)), Exp_Val (VInt 7))
-       ))
-;;
-
-let%test "s" =
-  test
-    equal_expr
-    e_access_by_point
-    "a.b.n.m"
-    (Access_By_Point
-       ( Exp_Name (Name "a")
-       , Access_By_Point
-           ( Exp_Name (Name "b")
-           , Access_By_Point (Exp_Name (Name "n"), Exp_Name (Name "m")) ) ))
-;;
-
-let%test "s" =
-  test
-    equal_expr
-    e_op
-    "  a = b = n= m"
-    (Bin_op
-       ( Assign
-       , Exp_Name (Name "a")
-       , Bin_op
-           ( Assign
-           , Exp_Name (Name "b")
-           , Bin_op (Assign, Exp_Name (Name "n"), Exp_Name (Name "m")) ) ))
-;;
-
-let%test "t" =
-  test
-    equal_expr
-    p_body
-    "{if (true) \n\
-    \      { a(); \n\
-    \        if(false) \n\
-    \          {\n\
-    \            e    = b; \n\
-    \            return;\n\
-    \          } else \n\
-    \            {\n\
-    \              int  ?   exmp = 243 + 1;\n\
-    \            }\n\
-    \          }; ; ;     ; \n\
-    \          a(1+2 , cl)  ; ;   ; \n\
-    \          if (1+ run()) \n\
-    \                {\n\
-    \                  first(1);\n\
-    \                } else if (true) {} \n\
-    \          return 1+1; ; ;\n\
-    \  }"
-    (Exp_Body
-       [ If_Else
-           ( Exp_Val (VBool true)
-           , Exp_Body
-               [ Method_invoke (Exp_Name (Name "a"), Exp_Args [])
-               ; If_Else
-                   ( Exp_Val (VBool false)
-                   , Exp_Body
-                       [ Bin_op (Assign, Exp_Name (Name "e"), Exp_Name (Name "b"))
-                       ; Return None
-                       ]
-                   , Some
-                       (Exp_Body
-                          [ Exp_Assign
-                              ( Var_Declaration (TNullable_type TInt, Name "exmp")
-                              , Bin_op (Plus, Exp_Val (VInt 243), Exp_Val (VInt 1)) )
-                          ]) )
-               ]
-           , None )
-       ; Method_invoke
-           ( Exp_Name (Name "a")
-           , Exp_Args
-               [ Bin_op (Plus, Exp_Val (VInt 1), Exp_Val (VInt 2)); Exp_Name (Name "cl") ]
-           )
-       ; If_Else
-           ( Bin_op
-               (Plus, Exp_Val (VInt 1), Method_invoke (Exp_Name (Name "run"), Exp_Args []))
-           , Exp_Body
-               [ Method_invoke (Exp_Name (Name "first"), Exp_Args [ Exp_Val (VInt 1) ]) ]
-           , Some (If_Else (Exp_Val (VBool true), Exp_Body [], None)) )
-       ; Return (Some (Bin_op (Plus, Exp_Val (VInt 1), Exp_Val (VInt 1))))
-       ])
-;;
-
-let%test "s" = test equal_method_modifier p_m_modifier " private" (MAccess Private)
-let test_fac = print_pars e_method pp_methods
-
-let%expect_test _ =
-  test_fac
-    "static int Fac(int num)\n\
-    \    {\n\
-    \        if (num == 1)\n\
-    \        {\n\
-    \            return 1;\n\
-    \        }\n\
-    \        else \n\
-    \        {\n\
-    \            return num * Fac(num - 1);\n\
-    \        }\n\
-    \    }";
-  [%expect
-    {|
-      (Method ((Some [Static]), (TNot_nullable_type (TBase TInt)), (Name "Fac"),
-         (Exp_Args
-            [(Var_Declaration ((TNot_nullable_type (TBase TInt)), (Name "num")))]),
-         (Exp_Body
-            [(If_Else (
-                (Bin_op (Equal, (Exp_Name (Name "num")), (Exp_Val (VInt 1)))),
-                (Exp_Body [(Return (Some (Exp_Val (VInt 1))))]),
-                (Some (Exp_Body
-                         [(Return
-                             (Some (Bin_op (Asterisk, (Exp_Name (Name "num")),
-                                      (Method_invoke ((Exp_Name (Name "Fac")),
-                                         (Exp_Args
-                                            [(Bin_op (Dash,
-                                                (Exp_Name (Name "num")),
-                                                (Exp_Val (VInt 1))))
-                                              ])
-                                         ))
-                                      ))))
-                           ]))
-                ))
-              ])
-         )) |}]
 ;;
