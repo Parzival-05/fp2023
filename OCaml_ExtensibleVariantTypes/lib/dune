@@ -1,7 +1,7 @@
 (library
  (name OCaml_ExtensibleVariantTypes_lib)
  (public_name OCaml_ExtensibleVariantTypes.Lib)
- (modules Ast Parser)
+ (modules Ast Parser Interpreter Parser Inferencer Typing)
  (libraries base angstrom)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq))
