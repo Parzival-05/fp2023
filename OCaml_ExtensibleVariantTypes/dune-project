@@ -17,8 +17,8 @@
 
 (package
  (name OCaml_ExtensibleVariantTypes) ; FIXME and regenerate .opam file using 'dune build @install'
- (synopsis "Interpreter of OCaml with extensible variant types")
- (description "Interpreter of OCaml with extensible variant types")
+ (synopsis "Interpreter of OCaml")
+ (description "Interpreter of OCaml")
  (version 0.1)
  (depends
   dune
