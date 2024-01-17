@@ -170,7 +170,7 @@ let parse_bin_op_app parse_expr =
     and parse_app parse_expr =
       let term = chainl1 parse_expr app_binder in
       let term = choice [ parse_un_op_app term; term ] in
-      let cons = parse_satisfy_op_and_run "::" (return @@ elist) in
+      let cons = parse_satisfy_op_and_run "::" (return elist) in
       chainr1 term cons
     in
     parse_bin_op (parse_app parse_expr))
@@ -201,7 +201,7 @@ let parse_letters =
 ;;
 
 let parse_identifier =
-  parse_token @@ parse_letters
+  parse_token parse_letters
   >>= fun ident -> if is_keyword ident then fail "invalid syntax" else return ident
 ;;
 

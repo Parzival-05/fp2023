@@ -417,14 +417,10 @@ let rec infer env = function
         let* subst_res_2, typ_res_2 = infer (TypeEnv.apply subst_pat env_new) expr_res in
         let* subst_u = unify typ_res_2 (Subst.apply subst_res_2 typ_res) in
         let* subst_e = Subst.compose_all [ subst_e; subst_u; subst_res_2; subst_pat ] in
-        if tl = []
-        then return (subst_e, Subst.apply subst_e typ_res_2)
-        else
-          check_cases
-            (Subst.apply subst_e typ_res_2)
-            (Subst.apply subst_e typ_pat)
-            subst_e
-            tl
+        let typ_res_2 = Subst.apply subst_e typ_res_2 in
+        (match tl with
+         | [] -> return (subst_e, typ_res_2)
+         | _ -> check_cases typ_res_2 (Subst.apply subst_e typ_pat) subst_e tl)
       | [] -> fail ParsingError
     in
     let* subst_e, typ_e = infer env e in
