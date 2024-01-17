@@ -1,20 +1,17 @@
-### An implementaion of Lambda mini-language
+### An implementaion of OCaml mini-language
 
 This is a homework for functional programming course.
 
 License: LGPL for implementation code + WTFPL for test examles in miniLanguage
 
-Author: Vasy Pupkin, vasya@pupkin.com
+Author: David Akhmedov, st106763@student.spbu.ru
 
-Features done (append only):
+Features done:
 
+- Support of pattern matching, lists, tuples, first order functions
 - Parser
-- interpreter
-- inferencer
-
-Features in progress (and TODOs):
-
--
+- Interpreter
+- Inferencer
 
 ##### Замечания по стилю кодирования
 
