@@ -7,10 +7,10 @@ open Ast
 type type_variable_number = int
 
 type ground =
-  | GInt
-  | GBool
-  | GNil
-  | GUnit
+  | GInt (* Int *)
+  | GBool (* Bool *)
+  | GNil (* Empty list — [] *)
+  | GUnit (* Unit — () *)
 [@@deriving eq, show { with_path = false }]
 
 type typ =
@@ -80,7 +80,7 @@ let print_typ ?(carriage = false) typ =
 type error =
   | OccursCheck
   | UnboundValue of ident
-  | MismatchValues of typ * typ
+  | MismatchValues of typ * typ (* For pattern matching errors *)
   | UnificationFailed of typ * typ
   | ParserAvoidedError
 
