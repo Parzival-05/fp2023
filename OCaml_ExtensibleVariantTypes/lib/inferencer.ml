@@ -292,8 +292,8 @@ let rec infer env = function
        let* subst_1 = unify typ_left tbool in
        let* subst_2 = unify typ_right tbool in
        let* subst_result = Subst.compose_all [ subst_1; subst_2; subst_result ] in
-       return @@ (subst_result, tbool)
-     | _ -> fail @@ ParserAvoidedError)
+       return (subst_result, tbool)
+     | _ -> fail ParserAvoidedError)
   | EId ident -> lookup_env ident env
   | EUnop (unop, expr) ->
     let* subst, typ = infer env expr in
@@ -379,7 +379,7 @@ and infer_decl env = function
   | DLet (Not_recursive, id, expr) ->
     let* subst, typ = infer env expr in
     let env = TypeEnv.extend env id (generalize env typ) in
-    return @@ (subst, env)
+    return (subst, env)
   | DLet (Recursive, id, expr) ->
     let* type_variable = fresh_var in
     let env = TypeEnv.extend env id (Scheme.empty, type_variable) in
@@ -388,7 +388,7 @@ and infer_decl env = function
     let* subst = Subst.compose ~is_rec:true subst_2 subst in
     let type_variable = Subst.apply subst type_variable in
     let scheme = generalize env type_variable in
-    return @@ (subst, TypeEnv.extend env id scheme)
+    return (subst, TypeEnv.extend env id scheme)
 ;;
 
 let run_inference prog =
