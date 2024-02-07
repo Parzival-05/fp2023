@@ -1,42 +1,16 @@
-(** Copyright 2023-2024, David Akhmedov *)
+(** Copyright 2023-2024, Dmitrii Kosarev, David Akhmedov *)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
+(** ref: https://gitlab.com/Kakadu/fp2020course-materials/-/blob/master/code/miniml/inferencer.ml **)
 open Ast
+
 open Typing
 
-module R : sig
-  type 'a t
-
-  val bind : 'a t -> f:('a -> 'b t) -> 'b t
-  val return : 'a -> 'a t
-  val fail : error -> 'a t
-
-  include Base.Monad.Infix with type 'a t := 'a t
-
-  module Syntax : sig
-    val ( let* ) : 'a t -> ('a -> 'b t) -> 'b t
-  end
-
-  module RList : sig
-    val fold_left
-      :  (int, 'a, Base.Int.comparator_witness) Base.Map.t
-      -> init:'b t
-      -> f:(int -> 'a -> 'b -> 'b t)
-      -> 'b t
-  end
-
-  (** Creation of a fresh name from internal state *)
-  val fresh : int t
-
-  (** Running a transformer: getting the inner result value *)
-  val run : 'a t -> ('a, error) Result.t
-end = struct
-  (* A compositon: State monad after Result monad *)
+module R = struct
   type 'a t = int -> int * ('a, error) Result.t
 
-  let ( >>= ) : 'a 'b. 'a t -> ('a -> 'b t) -> 'b t =
-    fun monad f state ->
+  let ( >>= ) monad f state =
     let last, result = monad state in
     match result with
     | Error e -> last, Error e
@@ -45,17 +19,16 @@ end = struct
 
   let fail error state = state, Base.Result.fail error
   let return value last = last, Base.Result.return value
-  let bind x ~f = x >>= f
+  let bind x f = x >>= f
 
-  let ( >>| ) : 'a 'b. 'a t -> ('a -> 'b) -> 'b t =
-    fun x f state ->
+  let ( >>| ) x f state =
     match x state with
     | state, Ok x -> state, Ok (f x)
     | state, Error e -> state, Error e
   ;;
 
   module Syntax = struct
-    let ( let* ) x f = bind x ~f
+    let ( let* ) = bind
   end
 
   module RList = struct
@@ -67,7 +40,7 @@ end = struct
     ;;
   end
 
-  let fresh : int t = fun last -> last + 1, Result.Ok last
+  let fresh last = last + 1, Result.Ok last
   let run monad = snd (monad 0)
 end
 
@@ -101,29 +74,10 @@ module Type = struct
   ;;
 end
 
-module Subst : sig
-  type t
-
-  val empty : t
-  val singleton : ?is_rec:bool -> fresh -> typ -> t R.t
-
-  (** Getting value from substitution *)
-  val find_exn : fresh -> t -> typ
-
-  val find : fresh -> t -> typ option
-  val apply : t -> typ -> typ
-  val unify : ?is_rec:bool -> typ -> typ -> t R.t
-
-  (** Compositon of substitutions *)
-  val compose : ?is_rec:bool -> t -> t -> t R.t
-
-  val compose_all : ?is_rec:bool -> t list -> t R.t
-  val remove : t -> fresh -> t
-end = struct
+module Subst = struct
   open R
   open R.Syntax
 
-  (* An association list. In real world replace it by Map *)
   type t = (fresh, typ, Base.Int.comparator_witness) Base.Map.t
 
   let empty = Base.Map.empty (module Base.Int)
@@ -162,7 +116,7 @@ end = struct
     | TGround GUnit, _ | _, TGround GUnit -> return empty
     | TGround l, TGround r when l = r -> return empty
     | TVar a, TVar b when a = b -> return empty
-    | TVar b, t | t, TVar b -> singleton ~is_rec b t
+    | TVar b, typ | typ, TVar b -> singleton ~is_rec b typ
     | TArr (f1, s1), TArr (f2, s2) ->
       let* subst1 = unify ~is_rec f1 f2 in
       let* subst2 = unify ~is_rec (apply subst1 s1) (apply subst1 s2) in
@@ -214,18 +168,12 @@ module Scheme = struct
   type t = scheme
 
   let empty = Base.Set.empty (module Base.Int)
+  let occurs_in key (set, typ) = (not (Base.Set.mem set key)) && Type.occurs_in key typ
+  let free_vars (set, typ) = Base.Set.diff set (Type.free_vars typ)
 
-  let occurs_in key = function
-    | set, t -> (not (Base.Set.mem set key)) && Type.occurs_in key t
-  ;;
-
-  let free_vars = function
-    | set, t -> Base.Set.diff set (Type.free_vars t)
-  ;;
-
-  let apply subst (s, t) =
-    let s2 = Base.Set.fold s ~init:subst ~f:(fun acc k -> Subst.remove acc k) in
-    s, Subst.apply s2 t
+  let apply subst (set, typ) =
+    let s2 = Base.Set.fold set ~init:subst ~f:(fun acc k -> Subst.remove acc k) in
+    set, Subst.apply s2 typ
   ;;
 end
 
@@ -257,8 +205,8 @@ let instantiate ?(is_rec = false) =
       let* acc = acc in
       f acc x)
   in
-  fun (set, t) ->
-    fold_right set (return t) (fun typ name ->
+  fun (set, typ) ->
+    fold_right set (return typ) (fun typ name ->
       let* f1 = fresh_var in
       let* s = Subst.singleton ~is_rec name f1 in
       return @@ Subst.apply s typ)
@@ -389,7 +337,7 @@ let rec infer env = function
     let* subst_result = Subst.compose_all [ subst_hd; subst_tl; s3 ] in
     return (subst_result, Subst.apply subst_result typ_lhd)
   | ETuple x ->
-    let* s, t =
+    let* subst_result, typ_list =
       List.fold_left
         (fun acc expr ->
           let* subst, typ = infer env expr in
@@ -399,7 +347,7 @@ let rec infer env = function
         (return (Subst.empty, []))
         x
     in
-    return (s, ttuple @@ List.rev t)
+    return (subst_result, ttuple @@ List.rev typ_list)
   | EClsr (decl, expr) ->
     let* subst_decl, env = infer_decl env decl in
     let* subst, typ_expr = infer env expr in
