@@ -22,8 +22,19 @@
  (instrumentation
   (backend bisect_ppx)))
 
+(executable
+ (name cps_demo)
+ (modules cps_demo)
+ (public_name cps_demo)
+ (libraries OCaml_ExtensibleVariantTypes_lib)
+ (instrumentation
+  (backend bisect_ppx)))
+
 (cram
  (deps %{bin:fact_demo}))
 
 (cram
  (deps %{bin:lists_demo}))
+
+(cram
+ (deps %{bin:cps_demo}))
