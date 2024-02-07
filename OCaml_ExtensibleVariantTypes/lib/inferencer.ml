@@ -345,7 +345,7 @@ let rec infer env = function
        let* subst_2 = unify typ_right tbool in
        let* subst_result = Subst.compose_all [ subst_1; subst_2; subst_result ] in
        return @@ (subst_result, tbool)
-     | _ -> fail @@ ParsingError)
+     | _ -> fail @@ ParserAvoidedError)
   | EId ident -> lookup_env ident env
   | EUnop (unop, expr) ->
     let* subst, typ = infer env expr in
@@ -421,7 +421,7 @@ let rec infer env = function
         (match tl with
          | [] -> return (subst_e, typ_res_2)
          | _ -> check_cases typ_res_2 (Subst.apply subst_e typ_pat) subst_e tl)
-      | [] -> fail ParsingError
+      | [] -> fail ParserAvoidedError
     in
     let* subst_e, typ_e = infer env e in
     let* type_variable = fresh_var in

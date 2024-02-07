@@ -24,7 +24,7 @@ and value =
 
 type error =
   | UnboundValue of string
-  | ParseError
+  | ParserAvoidedError
   | UnsupportedOperation
   | Division_by_zero
   | NonExhaustivePatternMatching
@@ -54,7 +54,7 @@ let pp_error fmt = function
   | UnsupportedOperation -> fprintf fmt "Unsupported operation"
   | Division_by_zero -> fprintf fmt "Division by zero"
   | NonExhaustivePatternMatching -> fprintf fmt "This pattern-matching is not exhaustive"
-  | ParseError ->
+  | ParserAvoidedError ->
     fprintf
       fmt
       "Use the parser to get the AST: the parser does some optimizations of expressions"
@@ -137,14 +137,14 @@ end = struct
          if y = 0 then fail Division_by_zero else return @@ VInt (x / y)
        | VBool x, And, VBool y -> return @@ VBool (x && y)
        | _, (Add | Sub | Mul | Div | And), _ -> fail TypeError
-       | _, Or, _ -> fail ParseError
+       | _, Or, _ -> fail ParserAvoidedError
        | left, op, right ->
          let comparison_operation = function
            | Eq -> return Base.Poly.( = )
            | Less -> return Base.Poly.( < )
            | Leq -> return Base.Poly.( <= )
-           | _ ->
-             fail ParseError (* Gre, Geq must be replaced by Less and Leq after parsing*)
+           | _ -> fail ParserAvoidedError
+           (* Gre, Geq must be replaced by Less and Leq after parsing*)
          in
          let compare x y =
            let* compare = comparison_operation op in

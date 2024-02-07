@@ -82,7 +82,7 @@ type error =
   | UnboundValue of ident
   | MismatchValues of typ * typ
   | UnificationFailed of typ * typ
-  | ParsingError
+  | ParserAvoidedError
 
 let pp_error fmt err =
   let open Format in
@@ -99,7 +99,10 @@ let pp_error fmt err =
     pp_type fmt t1;
     fprintf fmt " but an expression was expected of ";
     pp_type fmt t2
-  | ParsingError -> fprintf fmt "If you see this, then use the parser to get the AST"
+  | ParserAvoidedError ->
+    fprintf
+      fmt
+      "Use the parser to get the AST: the parser does some optimizations of expressions"
 ;;
 
 let print_type_error error =
