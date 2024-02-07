@@ -9,7 +9,6 @@ type type_variable_number = int
 type ground =
   | GInt (* Int *)
   | GBool (* Bool *)
-  | GNil (* Empty list — [] *)
   | GUnit (* Unit — () *)
 [@@deriving eq, show { with_path = false }]
 
@@ -22,7 +21,6 @@ type typ =
 
 let tint = TGround GInt
 let tbool = TGround GBool
-let tnil = TGround GNil
 let tunit = TGround GUnit
 let tarrow left_type right_type = TArr (left_type, right_type)
 let ttuple type_list = TTuple type_list
@@ -40,7 +38,6 @@ let rec pp_type fmt typ =
     (match x with
      | GInt -> fprintf fmt "int"
      | GBool -> fprintf fmt "bool"
-     | GNil -> fprintf fmt "nil"
      | GUnit -> fprintf fmt "Unit")
   | TVar var ->
     let ascii_code_of_a = 97 in
