@@ -42,7 +42,9 @@ let rec pp_type fmt typ =
      | GBool -> fprintf fmt "bool"
      | GNil -> fprintf fmt "nil"
      | GUnit -> fprintf fmt "Unit")
-  | TVar var -> fprintf fmt "%s" ("'" ^ Char.escaped (Char.chr (var + 97)))
+  | TVar var ->
+    let ascii_code_of_a = 97 in
+    fprintf fmt "%s" ("'" ^ Char.escaped (Char.chr (var + ascii_code_of_a)))
   | TTuple value_list ->
     let pp_tuple value_list =
       let pp_el fmt typ =
