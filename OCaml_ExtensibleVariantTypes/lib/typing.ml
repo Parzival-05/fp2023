@@ -55,11 +55,13 @@ let rec pp_type fmt typ =
         in
         fprintf fmt s pp_type typ
       in
-      match value_list with
-      | hd :: tl ->
-        fprintf fmt "%a" pp_el hd;
-        List.fold_left (fun _ typ -> fprintf fmt " * %a" pp_el typ) () tl
-      | _ -> ()
+      let pp_list fmt delimiter =
+        pp_print_list
+          ~pp_sep:(fun fmt _ -> fprintf fmt delimiter)
+          (fun fmt value -> pp_el fmt value)
+          fmt
+      in
+      pp_list fmt " * " value_list
     in
     pp_tuple value_list
   | TList typ ->
