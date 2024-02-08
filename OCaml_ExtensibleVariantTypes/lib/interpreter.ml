@@ -57,7 +57,7 @@ let pp_error fmt = function
   | ParserAvoidedError ->
     fprintf
       fmt
-      "Use the parser to get the AST: the parser does some optimizations of expressions"
+      "Use the parser to get the AST: the parser does some transformations of expressions"
   | TypeError -> fprintf fmt "Use type checking"
 ;;
 
