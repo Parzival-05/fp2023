@@ -3,11 +3,13 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 (** ref: https://gitlab.com/Kakadu/fp2020course-materials/-/blob/master/code/miniml/inferencer.ml **)
-open Ast
 
+open Ast
 open Typing
 
 module R = struct
+  open Base.Result
+
   type 'a t = int -> int * ('a, error) Result.t
 
   let ( >>= ) monad f state =
@@ -17,18 +19,11 @@ module R = struct
     | Ok value -> f value last
   ;;
 
-  let fail error state = state, Base.Result.fail error
-  let return value last = last, Base.Result.return value
-  let bind x f = x >>= f
-
-  let ( >>| ) x f state =
-    match x state with
-    | state, Ok x -> state, Ok (f x)
-    | state, Error e -> state, Error e
-  ;;
+  let fail error state = state, fail error
+  let return value last = last, return value
 
   module Syntax = struct
-    let ( let* ) = bind
+    let ( let* ) x f = x >>= f
   end
 
   module RList = struct
@@ -40,7 +35,7 @@ module R = struct
     ;;
   end
 
-  let fresh last = last + 1, Result.Ok last
+  let fresh last = last + 1, Ok last
   let run monad = snd (monad 0)
 end
 
@@ -58,19 +53,19 @@ module Type = struct
   ;;
 
   let free_vars =
-    let empty_set = Base.Set.empty (module Base.Int) in
+    let empty = Base.Set.empty (module Base.Int) in
     let rec helper acc = function
       | TVar n -> Base.Set.add acc n
       | TArr (left, right) -> helper (helper acc left) right
       | TTuple typ_list ->
         Base.List.fold_right
           typ_list
-          ~f:(fun typ acc -> Base.Set.union (helper empty_set typ) acc)
+          ~f:(fun typ acc -> Base.Set.union (helper empty typ) acc)
           ~init:acc
       | TList typ -> helper acc typ
       | TGround _ -> acc
     in
-    helper empty_set
+    helper empty
   ;;
 end
 
@@ -93,7 +88,6 @@ module Subst = struct
     return @@ Base.Map.update empty key ~f:(fun _ -> value)
   ;;
 
-  let find_exn key subst = Base.Map.find_exn subst key
   let find key subst = Base.Map.find subst key
   let remove subst key = Base.Map.remove subst key
 
@@ -138,14 +132,14 @@ module Subst = struct
   and extend ?(is_rec = false) key value subst =
     match find key subst with
     | None ->
-      let v = apply subst value in
-      let* s2 = singleton ~is_rec key v in
+      let value = apply subst value in
+      let* s2 = singleton ~is_rec key value in
       RList.fold_left
         subst
-        ~f:(fun k v acc ->
-          let v = apply s2 v in
-          let* k, v = mapping ~is_rec k v in
-          return @@ Base.Map.update acc k ~f:(fun _ -> v))
+        ~f:(fun key value acc ->
+          let value = apply s2 value in
+          let* key, value = mapping ~is_rec key value in
+          return @@ Base.Map.update acc key ~f:(fun _ -> value))
         ~init:(return s2)
     | Some v2 ->
       let* s2 = unify ~is_rec value v2 in
@@ -190,14 +184,17 @@ module TypeEnv = struct
   ;;
 
   let apply s env = Base.Map.map env ~f:(Scheme.apply s)
-  let find_exn name map = Base.Map.find_exn ~equal:String.equal map name
 end
 
 open R
 open R.Syntax
 
 let unify = Subst.unify
-let fresh_var = fresh >>| tvar
+
+let fresh_var =
+  let* fresh = fresh in
+  return @@ tvar fresh
+;;
 
 let instantiate ?(is_rec = false) =
   let fold_right set init f =
@@ -207,13 +204,12 @@ let instantiate ?(is_rec = false) =
   in
   fun (set, typ) ->
     fold_right set (return typ) (fun typ name ->
-      let* f1 = fresh_var in
-      let* s = Subst.singleton ~is_rec name f1 in
-      return @@ Subst.apply s typ)
+      let* fresh_var = fresh_var in
+      let* subst = Subst.singleton ~is_rec name fresh_var in
+      return @@ Subst.apply subst typ)
 ;;
 
-let generalize : TypeEnv.t -> Type.t -> Scheme.t =
-  fun env typ ->
+let generalize env typ =
   let free = Base.Set.diff (Type.free_vars typ) (TypeEnv.free_vars env) in
   free, typ
 ;;
@@ -248,7 +244,7 @@ let infer_ptrn ?(env = TypeEnv.empty) pat =
     | PList (hd, tl) ->
       let* env, typ_hd = helper env hd in
       let* env, typ_tl = helper env tl in
-      let* subst = Subst.unify (tlist typ_hd) typ_tl in
+      let* subst = unify (tlist typ_hd) typ_tl in
       let env = TypeEnv.apply subst env in
       return (env, tlist (Subst.apply subst typ_hd))
     | PTuple tuple ->
