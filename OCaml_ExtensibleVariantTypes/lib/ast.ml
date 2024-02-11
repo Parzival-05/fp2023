@@ -3,72 +3,72 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 type const =
-  | CInt of int (* int *)
-  | CBool of bool (* bool *)
-  | CNil (* [] *)
-  | CUnit (* () *)
+  | CInt of int (** int *)
+  | CBool of bool (** bool *)
+  | CNil (** [] *)
+  | CUnit (** () *)
 [@@deriving eq, show { with_path = false }]
 
 type bin_op =
-  | Add (* + *)
-  | Sub (* - *)
-  | Mul (* * *)
-  | Div (* / *)
-  | Leq (* <= *)
-  | Less (* < *)
-  | Geq (* >= *)
-  | Gre (* > *)
-  | Eq (* == *)
-  | Neq (* != *)
-  | And (* && *)
-  | Or (* || *)
+  | Add (** + *)
+  | Sub (** - *)
+  | Mul (** * *)
+  | Div (** / *)
+  | Leq (** <= *)
+  | Less (** < *)
+  | Geq (** >= *)
+  | Gre (** > *)
+  | Eq (** == *)
+  | Neq (** != *)
+  | And (** && *)
+  | Or (** || *)
 [@@deriving eq, show { with_path = false }]
 
 type unary_op =
-  | Plus (* ~+ *)
-  | Minus (* ~- *)
-  | Not (* ~not *)
+  | Plus (** ~+ *)
+  | Minus (** ~- *)
+  | Not (** ~not *)
 [@@deriving eq, show { with_path = false }]
 
 type ident = string [@@deriving eq, show { with_path = false }]
 
-type capitalized_ident = Capitalized_ident of string (* Capitalized idents *)
+type capitalized_ident = Capitalized_ident of string (** Capitalized idents *)
 [@@deriving eq, show { with_path = false }]
 
 type rec_flag =
-  | Recursive (* Recursive *)
-  | Not_recursive (* Not recursive *)
+  | Recursive (** Recursive *)
+  | Not_recursive (** Not recursive *)
 [@@deriving eq, show { with_path = false }]
 
 type pattern =
-  | PId of ident (* x *)
-  | PTuple of pattern list (* (x, y) *)
-  | PList of pattern * pattern (* x :: xs *)
-  | PConst of const (* 3 *)
+  | PId of ident (** x *)
+  | PTuple of pattern list (** (x, y) *)
+  | PList of pattern * pattern (** x :: xs *)
+  | PConst of const (** 3 *)
 [@@deriving eq, show { with_path = false }]
 
 type expr =
-  | EConst of const (* Const. Examples: 100; true *)
-  | EBinop of
-      expr * bin_op * expr (* Binary operation. Examples: 2 + 2; (234 * 234) + 234 *)
-  | EUnop of unary_op * expr (* Unary operation. Examples: -(1); (+b) *)
-  | EId of ident (* Identifier. Examples: a, b, c *)
-  | EFun of pattern * expr (* Function. Examples: fun x -> x + 1 *)
-  | EApp of expr * expr (* Application. Examples: f (x - 1) *)
-  | EIf of
-      expr * expr * expr (* If-then-else. Examples: if x >= y then x - y else y - x *)
-  | EList of expr * expr (* Lists. Examples: [1; 2; 3] *)
-  | ETuple of expr list (* Tuple. Examples: (1, 2, 3) *)
-  | EClsr of decl * expr (* Closure. Examples: let inc x = x + 1 in inc 5*)
+  | EConst of const (** Const. Examples: 100; true *)
+  | EBinop of expr * bin_op * expr
+  (** Binary operation. Examples: 2 + 2; (234 * 234) + 234 *)
+  | EUnop of unary_op * expr (** Unary operation. Examples: -(1); (+b) *)
+  | EId of ident (** Identifier. Examples: a, b, c *)
+  | EFun of pattern * expr (** Function. Examples: fun x -> x + 1 *)
+  | EApp of expr * expr (** Application. Examples: f (x - 1) *)
+  | EIf of expr * expr * expr
+  (** If-then-else. Examples: if x >= y then x - y else y - x *)
+  | EList of expr * expr (** Lists. Examples: [1; 2; 3] *)
+  | ETuple of expr list (** Tuple. Examples: (1, 2, 3) *)
+  | EClsr of decl * expr (** Closure. Examples: let inc x = x + 1 in inc 5*)
   | EMatch of expr * (pattern * expr) list
-    (* Matching. Examples: match l with | hd::tl -> hd | _ -> [] *)
-  | EStd of ident (* Std functions (only for print) *)
+  (** Matching. Examples: match l with | hd::tl -> hd | _ -> [] *)
+  | EStd of ident (** Std functions (only for print) *)
 [@@deriving eq, show { with_path = false }]
 
-and decl = DLet of rec_flag * ident * expr
-(* Let declarations *) [@@deriving eq, show { with_path = false }]
+and decl = DLet of rec_flag * ident * expr (** Let declarations *)
+[@@deriving eq, show { with_path = false }]
 
-type prog = decl list [@@deriving eq, show { with_path = false }] (* program *)
+type prog = decl list [@@deriving eq, show { with_path = false }]
 
 let pid id = PId id
 let ptuple p_list = PTuple p_list
