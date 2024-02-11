@@ -410,4 +410,19 @@ module InterpretTests = struct
         val sum_of_squares_result : int = 55
       |}]
   ;;
+
+  let%expect_test _ =
+    interpret_test
+      {|
+        let fst (x, _) = x
+        let snd (_, x) = x
+        let a = fst (1,2) + snd (3,4)
+       |};
+    [%expect
+      {| 
+        val a : int = 5
+        val fst : 'a * 'b -> 'a = <fun>
+        val snd : 'c * 'd -> 'd = <fun>
+      |}]
+  ;;
 end
