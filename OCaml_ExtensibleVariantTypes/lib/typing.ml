@@ -10,7 +10,6 @@ type ground =
   | GInt (* Int *)
   | GBool (* Bool *)
   | GUnit (* Unit — () *)
-  | GWild (* Wildcard — _ *)
 [@@deriving eq, show { with_path = false }]
 
 type typ =
@@ -23,7 +22,6 @@ type typ =
 let tint = TGround GInt
 let tbool = TGround GBool
 let tunit = TGround GUnit
-let twild = TGround GWild
 let tarrow left_type right_type = TArr (left_type, right_type)
 let ttuple type_list = TTuple type_list
 let tlist typ = TList typ
@@ -40,8 +38,7 @@ let rec pp_type fmt typ =
     (match x with
      | GInt -> fprintf fmt "int"
      | GBool -> fprintf fmt "bool"
-     | GUnit -> fprintf fmt "Unit"
-     | GWild -> fprintf fmt "_")
+     | GUnit -> fprintf fmt "Unit")
   | TVar var ->
     let ascii_code_of_a = 97 in
     fprintf fmt "%s" ("'" ^ Char.escaped (Char.chr (var + ascii_code_of_a)))
