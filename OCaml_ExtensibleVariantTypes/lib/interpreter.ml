@@ -26,6 +26,7 @@ and value =
 type error =
   | UnboundValue of string
   | ParserAvoidedError
+    (* Use the parser to get the AST: the parser does some transformations of expressions *)
   | UnsupportedOperation
   | Division_by_zero
   | NonExhaustivePatternMatching
