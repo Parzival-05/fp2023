@@ -1,3 +1,7 @@
+(** Copyright 2023-2024, David Akhmedov *)
+
+(** SPDX-License-Identifier: LGPL-3.0-or-later *)
+
 val is_space : char -> bool
 val parse_space : string Angstrom.t
 val parse_space1 : string Angstrom.t

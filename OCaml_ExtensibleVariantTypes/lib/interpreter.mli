@@ -1,3 +1,7 @@
+(** Copyright 2023-2024, David Akhmedov *)
+
+(** SPDX-License-Identifier: LGPL-3.0-or-later *)
+
 module type MONAD_FAIL = sig
   type ('a, 'e) t
 
