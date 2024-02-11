@@ -130,7 +130,7 @@ end = struct
        | CInt x -> return @@ VInt x
        | CBool x -> return @@ VBool x
        | CNil -> return @@ VList []
-       | CUnit -> return @@ VUnit)
+       | CUnit -> return VUnit)
     | EBinop (left_expr, op, right_expr) ->
       let* left_value = eval left_expr environment in
       let* right_value = eval right_expr environment in
