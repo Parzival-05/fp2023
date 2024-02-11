@@ -3,37 +3,37 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 type const =
-  | CInt of int
-  | CBool of bool
-  | CNil
-  | CUnit
+  | CInt of int (* int *)
+  | CBool of bool (* bool *)
+  | CNil (* [] *)
+  | CUnit (* () *)
 
 val equal_const : const -> const -> bool
 val pp_const : Format.formatter -> const -> unit
 val show_const : const -> string
 
 type bin_op =
-  | Add
-  | Sub
-  | Mul
-  | Div
-  | Leq
-  | Less
-  | Geq
-  | Gre
-  | Eq
-  | Neq
-  | And
-  | Or
+  | Add (* + *)
+  | Sub (* - *)
+  | Mul (* * *)
+  | Div (* / *)
+  | Leq (* <= *)
+  | Less (* < *)
+  | Geq (* >= *)
+  | Gre (* > *)
+  | Eq (* == *)
+  | Neq (* != *)
+  | And (* && *)
+  | Or (* || *)
 
 val equal_bin_op : bin_op -> bin_op -> bool
 val pp_bin_op : Format.formatter -> bin_op -> unit
 val show_bin_op : bin_op -> string
 
 type unary_op =
-  | Plus
-  | Minus
-  | Not
+  | Plus (* ~+ *)
+  | Minus (* ~- *)
+  | Not (* ~not *)
 
 val equal_unary_op : unary_op -> unary_op -> bool
 val pp_unary_op : Format.formatter -> unary_op -> unit
@@ -45,45 +45,48 @@ val equal_ident : ident -> ident -> bool
 val pp_ident : Format.formatter -> ident -> unit
 val show_ident : ident -> string
 
-type capitalized_ident = Capitalized_ident of ident
+type capitalized_ident = Capitalized_ident of ident (* Capitalized idents *)
 
 val equal_capitalized_ident : capitalized_ident -> capitalized_ident -> bool
 val pp_capitalized_ident : Format.formatter -> capitalized_ident -> unit
 val show_capitalized_ident : capitalized_ident -> string
 
 type rec_flag =
-  | Recursive
-  | Not_recursive
+  | Recursive (* Recursive *)
+  | Not_recursive (* Not recursive *)
 
 val equal_rec_flag : rec_flag -> rec_flag -> bool
 val pp_rec_flag : Format.formatter -> rec_flag -> unit
 val show_rec_flag : rec_flag -> string
 
 type pattern =
-  | PId of ident
-  | PTuple of pattern list
-  | PList of pattern * pattern
-  | PConst of const
+  | PId of ident (* x *)
+  | PTuple of pattern list (* (x, y) *)
+  | PList of pattern * pattern (* x :: xs *)
+  | PConst of const (* 3 *)
 
 val equal_pattern : pattern -> pattern -> bool
 val pp_pattern : Format.formatter -> pattern -> unit
 val show_pattern : pattern -> string
 
 type expr =
-  | EConst of const
-  | EBinop of expr * bin_op * expr
-  | EUnop of unary_op * expr
-  | EId of ident
-  | EFun of pattern * expr
-  | EApp of expr * expr
-  | EIf of expr * expr * expr
-  | EList of expr * expr
-  | ETuple of expr list
-  | EClsr of decl * expr
+  | EConst of const (* Const. Examples: 100; true *)
+  | EBinop of
+      expr * bin_op * expr (* Binary operation. Examples: 2 + 2; (234 * 234) + 234 *)
+  | EUnop of unary_op * expr (* Unary operation. Examples: -(1); (+b) *)
+  | EId of ident (* Identifier. Examples: a, b, c *)
+  | EFun of pattern * expr (* Function. Examples: fun x -> x + 1 *)
+  | EApp of expr * expr (* Application. Examples: f (x - 1) *)
+  | EIf of
+      expr * expr * expr (* If-then-else. Examples: if x >= y then x - y else y - x *)
+  | EList of expr * expr (* Lists. Examples: [1; 2; 3] *)
+  | ETuple of expr list (* Tuple. Examples: (1, 2, 3) *)
+  | EClsr of decl * expr (* Closure. Examples: let inc x = x + 1 in inc 5*)
   | EMatch of expr * (pattern * expr) list
-  | EStd of ident
+    (* Matching. Examples: match l with | hd::tl -> hd | _ -> [] *)
+  | EStd of ident (* Std functions (only for print) *)
 
-and decl = DLet of rec_flag * ident * expr
+and decl = DLet of rec_flag * ident * expr (* Let declarations *)
 
 val equal_expr : expr -> expr -> bool
 val equal_decl : decl -> decl -> bool
@@ -92,7 +95,7 @@ val show_expr : expr -> string
 val pp_decl : Format.formatter -> decl -> unit
 val show_decl : decl -> string
 
-type prog = decl list
+type prog = decl list (* program *)
 
 val equal_prog : prog -> prog -> bool
 val pp_prog : Format.formatter -> prog -> unit

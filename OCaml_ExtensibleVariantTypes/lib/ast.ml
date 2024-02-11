@@ -3,10 +3,10 @@
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
 type const =
-  | CInt of int
-  | CBool of bool
-  | CNil
-  | CUnit
+  | CInt of int (* int *)
+  | CBool of bool (* bool *)
+  | CNil (* [] *)
+  | CUnit (* () *)
 [@@deriving eq, show { with_path = false }]
 
 type bin_op =
@@ -32,19 +32,19 @@ type unary_op =
 
 type ident = string [@@deriving eq, show { with_path = false }]
 
-type capitalized_ident = Capitalized_ident of string
+type capitalized_ident = Capitalized_ident of string (* Capitalized idents *)
 [@@deriving eq, show { with_path = false }]
 
 type rec_flag =
-  | Recursive
-  | Not_recursive
+  | Recursive (* Recursive *)
+  | Not_recursive (* Not recursive *)
 [@@deriving eq, show { with_path = false }]
 
 type pattern =
-  | PId of ident
-  | PTuple of pattern list
-  | PList of pattern * pattern
-  | PConst of const
+  | PId of ident (* x *)
+  | PTuple of pattern list (* (x, y) *)
+  | PList of pattern * pattern (* x :: xs *)
+  | PConst of const (* 3 *)
 [@@deriving eq, show { with_path = false }]
 
 type expr =
@@ -65,9 +65,10 @@ type expr =
   | EStd of ident (* Std functions (only for print) *)
 [@@deriving eq, show { with_path = false }]
 
-and decl = DLet of rec_flag * ident * expr [@@deriving eq, show { with_path = false }]
+and decl = DLet of rec_flag * ident * expr
+(* Let declarations *) [@@deriving eq, show { with_path = false }]
 
-type prog = decl list [@@deriving eq, show { with_path = false }]
+type prog = decl list [@@deriving eq, show { with_path = false }] (* program *)
 
 let pid id = PId id
 let ptuple p_list = PTuple p_list
