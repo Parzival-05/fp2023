@@ -232,6 +232,7 @@ let infer_ptrn ?(env = TypeEnv.empty) pat =
         | CNil ->
           let* fresh_variable = fresh_var in
           return (tlist fresh_variable)
+        | CUnit -> return tunit
       in
       return (env, typ)
     | PId x ->
@@ -268,6 +269,7 @@ let rec infer env = function
       | CNil ->
         let* fresh_var = fresh_var in
         return (tlist fresh_var)
+      | CUnit -> return tunit
     in
     return (Subst.empty, typ)
   | EBinop (left, binop, right) ->
@@ -290,7 +292,10 @@ let rec infer env = function
        let* subst_result = Subst.compose_all [ subst_1; subst_2; subst_result ] in
        return (subst_result, tbool)
      | _ -> fail ParserAvoidedError)
-  | EId ident -> lookup_env ident env
+  | EId ident ->
+    (match ident with
+     | "_" -> fail WildcardNotExpected
+     | _ -> lookup_env ident env)
   | EUnop (unop, expr) ->
     let* subst, typ = infer env expr in
     (match unop with
@@ -370,6 +375,7 @@ let rec infer env = function
     let* subst_e, typ_e = infer env e in
     let* type_variable = fresh_var in
     check_cases type_variable typ_e subst_e patmatch
+  | EStd x -> lookup_env x env
 
 and infer_decl env = function
   | DLet (Not_recursive, id, expr) ->
@@ -387,12 +393,29 @@ and infer_decl env = function
     return (subst, TypeEnv.extend env id scheme)
 ;;
 
+let init = [ "print_int", tarrow tint tunit; "print_newline", tarrow tunit tunit ]
+
+let init_env =
+  let bind env id typ = TypeEnv.extend env id (Scheme.empty, typ) in
+  let env = TypeEnv.empty in
+  List.fold_left (fun env (id, typ) -> bind env id typ) env init
+;;
+
 let run_inference prog =
   run
-    (Base.List.fold_left prog ~init:(return TypeEnv.empty) ~f:(fun env decl ->
+    (Base.List.fold_left prog ~init:(return init_env) ~f:(fun env decl ->
        let* env = env in
        let* _, env = infer_decl env decl in
        return env))
+;;
+
+let is_printable id typ =
+  let is_in_init =
+    match Base.Map.find init_env id with
+    | None -> false
+    | Some (_, typ_2) -> typ = typ_2
+  in
+  not (is_in_init || id = "_")
 ;;
 
 let print_env env =
@@ -400,7 +423,10 @@ let print_env env =
   | Ok env ->
     Base.Map.fold env ~init:() ~f:(fun ~key ~data _ ->
       let _, typ = data in
-      let _ = Format.printf "val %s : " key in
-      print_typ ~carriage:true typ)
+      if is_printable key typ
+      then (
+        let _ = Format.printf "val %s : " key in
+        print_typ ~carriage:true typ)
+      else ())
   | Error x -> print_type_error x
 ;;

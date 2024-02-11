@@ -18,6 +18,7 @@ type environment = (ident, value, Base.String.comparator_witness) Base.Map.t
 and value =
   | VInt of int
   | VBool of bool
+  | VUnit
   | VList of value list
   | VTuple of value list
   | VFun of pattern list * expr * rec_flag * environment
@@ -29,6 +30,7 @@ type error =
   | Division_by_zero
   | NonExhaustivePatternMatching
   | TypeError
+  | UnexpectedState (* Unexpected state related to standard functions *)
 
 open Format
 
@@ -42,6 +44,7 @@ let rec pp_value fmt =
   function
   | VInt value -> fprintf fmt "%d" value
   | VBool value -> fprintf fmt "%B" value
+  | VUnit -> fprintf fmt "()"
   | VList list -> fprintf fmt "[%a]" (fun fmt -> pp_list fmt "; ") list
   | VTuple tuple -> fprintf fmt "(%a)" (fun fmt -> pp_list fmt ", ") tuple
   | VFun _ -> fprintf fmt "<fun>"
@@ -59,6 +62,7 @@ let pp_error fmt = function
       fmt
       "Use the parser to get the AST: the parser does some transformations of expressions"
   | TypeError -> fprintf fmt "Use type checking"
+  | UnexpectedState -> fprintf fmt "Unexpected state related to standard functions"
 ;;
 
 let print_error = printf "%a" pp_error
@@ -125,7 +129,8 @@ end = struct
       (match const with
        | CInt x -> return @@ VInt x
        | CBool x -> return @@ VBool x
-       | CNil -> return @@ VList [])
+       | CNil -> return @@ VList []
+       | CUnit -> return @@ VUnit)
     | EBinop (left_expr, op, right_expr) ->
       let* left_value = eval left_expr environment in
       let* right_value = eval right_expr environment in
@@ -157,7 +162,21 @@ end = struct
           | VList x, VList y -> compare x y
           | _, _ -> fail UnsupportedOperation))
     | EId id ->
-      let* res = find environment id in
+      let* res =
+        run
+          (find environment id)
+          ~ok:(fun res -> return res)
+          ~err:(fun error ->
+            match error with
+            | UnboundValue _ ->
+              (match id with
+               | "print_int" ->
+                 return @@ VFun ([ PId "x" ], EStd id, Not_recursive, environment)
+               | "print_newline" ->
+                 return @@ VFun ([ PId "x" ], EStd id, Not_recursive, environment)
+               | _ -> fail error)
+            | _ -> fail error)
+      in
       return
         (match res with
          | VFun (pat_list, expr, Recursive, env) ->
@@ -180,7 +199,27 @@ end = struct
           | hd :: tl ->
             let* updated_env = update_env hd arg_val env in
             (match tl with
-             | [] -> eval expr updated_env
+             | [] ->
+               let _ =
+                 match expr with
+                 | EStd x ->
+                   (match x with
+                    | "print_int" ->
+                      (match arg_val with
+                       | VInt n ->
+                         let _ = print_int n in
+                         return ()
+                       | _ -> fail TypeError)
+                    | "print_newline" ->
+                      (match arg_val with
+                       | VUnit ->
+                         let _ = print_newline () in
+                         return ()
+                       | _ -> fail TypeError)
+                    | _ -> fail UnexpectedState)
+                 | _ -> return ()
+               in
+               eval expr updated_env
              | _ -> return @@ VFun (tl, expr, rec_flag, updated_env))
           | [] -> fail TypeError)
        | _ -> fail TypeError)
@@ -228,17 +267,22 @@ end = struct
         | [] -> fail NonExhaustivePatternMatching
       in
       check_patterns cases
+    | EStd x ->
+      (match x with
+       | "print_int" -> return VUnit
+       | "print_newline" -> return VUnit
+       | _ -> fail UnexpectedState)
   ;;
 
   let run (program : decl list) =
-    let environment = empty in
-    let rec helper environment = function
+    let env = empty in
+    let rec helper env = function
       | head :: tail ->
-        let* head_res = eval_decl environment head in
+        let* head_res = eval_decl env head in
         helper head_res tail
-      | [] -> return environment
+      | [] -> return env
     in
-    helper environment program
+    helper env program
   ;;
 end
 
@@ -263,15 +307,21 @@ let run_and_pp s =
        (match InterpretResult.run ast with
         | Ok env ->
           Base.Map.fold env ~init:() ~f:(fun ~key ~data _ ->
-            printf "val %s" key;
             match Base.Map.find env_inf key with
             | None -> ()
             | Some (_, typ) ->
-              print_string " : ";
-              Typing.print_typ typ;
-              print_string " = ";
-              print_value data;
-              printf "\n")
+              if Inferencer.is_printable key typ
+              then (
+                let _ =
+                  printf "val %s" key;
+                  print_string " : ";
+                  Typing.print_typ typ;
+                  print_string " = ";
+                  print_value data;
+                  printf "\n"
+                in
+                ())
+              else ())
         | Error err ->
           printf "Interpretation error: ";
           print_error err;

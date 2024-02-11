@@ -70,7 +70,7 @@ let parse_int =
 
 let parse_bool =
   choice [ parse_stoken "true" *> return true; parse_stoken "false" *> return false ]
-  >>= fun res_bool -> return @@ Ast.CBool res_bool
+  >>= fun res_bool -> return @@ CBool res_bool
 ;;
 
 let parse_const = choice [ parse_bool; parse_int ]
@@ -289,7 +289,8 @@ let parse_expr =
   fix (fun parse_expr ->
     let parser_ehelper =
       choice
-        [ parse_parens parse_expr
+        [ parse_stoken "(" *> parse_stoken ")" *> return CUnit >>| econst
+        ; parse_parens parse_expr
         ; parse_const_expr
         ; parse_identifier_expr
         ; parse_fun_anon_expr parse_expr

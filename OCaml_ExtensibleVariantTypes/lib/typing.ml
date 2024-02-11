@@ -87,6 +87,7 @@ type error =
   | MismatchValues of typ * typ (* For pattern matching errors *)
   | UnificationFailed of typ * typ
   | ParserAvoidedError
+  | WildcardNotExpected
 (* Use the parser to get the AST: the parser does some transformations of expressions *)
 
 let pp_error fmt err =
@@ -108,6 +109,7 @@ let pp_error fmt err =
     fprintf
       fmt
       "Use the parser to get the AST: the parser does some transformations of expressions"
+  | WildcardNotExpected -> fprintf fmt {| wildcard " _ " not expected |}
 ;;
 
 let print_type_error error =
