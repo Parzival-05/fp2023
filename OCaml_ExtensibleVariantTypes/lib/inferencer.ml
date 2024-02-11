@@ -107,7 +107,7 @@ module Subst = struct
 
   let rec unify ?(is_rec = false) l r =
     match l, r with
-    | TGround GUnit, _ | _, TGround GUnit -> return empty
+    | TGround GWild, _ | _, TGround GWild -> return empty
     | TGround l, TGround r when l = r -> return empty
     | TVar a, TVar b when a = b -> return empty
     | TVar b, typ | typ, TVar b -> singleton ~is_rec b typ
@@ -240,7 +240,7 @@ let infer_ptrn ?(env = TypeEnv.empty) pat =
         let* fresh_var = fresh_var in
         let env = TypeEnv.extend env x (Scheme.empty, fresh_var) in
         return (env, fresh_var)
-      else return (env, tunit)
+      else return (env, twild)
     | PList (hd, tl) ->
       let* env, typ_hd = helper env hd in
       let* env, typ_tl = helper env tl in
