@@ -25,6 +25,12 @@ let s =
     let sumlist_test = sumlist [ 1; 3; 5; 7; 100 ]
     let fac_test = fac 7
     let map_test = map (fun a -> a + 1) [ 1; 2; 3; 4; 5 ]
+    let _ = print_int fac_test
+    let _ = print_newline ()
+    let _ = if true then print_int 1 else print_int 0
+    let _ = print_newline ()
+    let print_int = 5
+    let a = 1 + print_int
   |}
 ;;
 

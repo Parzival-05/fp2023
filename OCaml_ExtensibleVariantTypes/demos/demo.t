@@ -25,6 +25,9 @@
   val unfoldr_next_number : int list -> int -> int list = <fun>
 
   $ dune exec cps_demo
+  5040
+  1
+  val a : int = 6
   val fac : int -> int = <fun>
   val fac_cps : int -> (int -> 'h) -> 'h = <fun>
   val fac_test : int = 5040
@@ -32,6 +35,7 @@
   val map : ('\147 -> '\146) -> '\147 list -> '\146 list = <fun>
   val map_cps : ('z -> '{) -> 'z list -> ('{ list -> 'y) -> 'y = <fun>
   val map_test : int list = [2; 3; 4; 5; 6]
+  val print_int : int = 5
   val sumlist : int list -> int = <fun>
   val sumlist_cps : int list -> (int -> 'l) -> 'l = <fun>
   val sumlist_test : int = 116
