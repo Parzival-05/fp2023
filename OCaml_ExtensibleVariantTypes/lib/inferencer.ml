@@ -235,12 +235,12 @@ let infer_ptrn ?(env = TypeEnv.empty) pat =
       in
       return (env, typ)
     | PId x ->
-      if x <> "_"
-      then
-        let* fresh_var = fresh_var in
-        let env = TypeEnv.extend env x (Scheme.empty, fresh_var) in
-        return (env, fresh_var)
-      else return (env, twild)
+      (match x with
+       | "_" -> return (env, twild)
+       | x ->
+         let* fresh_var = fresh_var in
+         let env = TypeEnv.extend env x (Scheme.empty, fresh_var) in
+         return (env, fresh_var))
     | PList (hd, tl) ->
       let* env, typ_hd = helper env hd in
       let* env, typ_tl = helper env tl in
