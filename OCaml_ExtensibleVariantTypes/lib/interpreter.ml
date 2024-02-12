@@ -66,7 +66,7 @@ let pp_error fmt = function
   | UnexpectedState -> fprintf fmt "Unexpected state related to standard functions"
 ;;
 
-let print_error = printf "%a" pp_error
+let print_error fmt = fprintf fmt "%a" pp_error
 
 module Environment (M : MONAD_FAIL) = struct
   open M
@@ -313,20 +313,23 @@ let run_and_pp s =
             | Some (_, typ) ->
               if Inferencer.is_printable key typ
               then (
-                let _ =
-                  printf "val %s" key;
-                  print_string " : ";
-                  Typing.print_typ typ;
-                  print_string " = ";
-                  print_value data;
-                  printf "\n"
+                let pp_result fmt (id, typ, value) =
+                  Format.fprintf
+                    fmt
+                    "val %s : %a = %a\n"
+                    id
+                    (Typing.print_typ ~carriage:false)
+                    typ
+                    pp_value
+                    value
                 in
-                ())
+                printf "%a" pp_result (key, typ, data))
               else ())
         | Error err ->
-          printf "Interpretation error: ";
-          print_error err;
-          printf "\n")
+          let pp_error fmt err =
+            fprintf fmt "Interpretation error: %a\n" print_error err
+          in
+          printf "%a" pp_error err)
      | Error x -> Typing.print_type_error x)
   | Error x -> Format.printf "%s\n" x
 ;;

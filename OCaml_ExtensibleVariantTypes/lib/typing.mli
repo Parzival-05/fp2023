@@ -1,7 +1,3 @@
-(** Copyright 2023-2024, David Akhmedov *)
-
-(** SPDX-License-Identifier: LGPL-3.0-or-later *)
-
 type type_variable_number = int
 
 type ground =
@@ -28,7 +24,7 @@ val ttuple : typ list -> typ
 val tlist : typ -> typ
 val tvar : type_variable_number -> typ
 val pp_type : Format.formatter -> typ -> unit
-val print_typ : ?carriage:bool -> typ -> unit
+val print_typ : Format.formatter -> ?carriage:bool -> typ -> unit
 
 type error =
   | OccursCheck

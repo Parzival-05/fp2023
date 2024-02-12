@@ -415,14 +415,17 @@ let is_printable id typ =
 ;;
 
 let print_env env =
+  let open Format in
   match env with
   | Ok env ->
     Base.Map.fold env ~init:() ~f:(fun ~key ~data _ ->
       let _, typ = data in
       if is_printable key typ
       then (
-        let _ = Format.printf "val %s : " key in
-        print_typ ~carriage:true typ)
+        let pp_res fmt (key, typ) =
+          fprintf fmt "val %s : %a" key (print_typ ~carriage:true) typ
+        in
+        printf "%a" pp_res (key, typ))
       else ())
   | Error x -> print_type_error x
 ;;

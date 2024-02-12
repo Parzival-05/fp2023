@@ -74,8 +74,11 @@ let rec pp_type fmt typ =
     fprintf fmt (arrow typ_left ^^ " -> %a") pp_type typ_left pp_type typ_right
 ;;
 
-let print_typ ?(carriage = false) typ =
-  Format.printf ("%s" ^^ if carriage then "\n" else "") (Format.asprintf "%a" pp_type typ)
+let print_typ fmt ?(carriage = false) typ =
+  Format.fprintf
+    fmt
+    ("%s" ^^ if carriage then "\n" else "")
+    (Format.asprintf "%a" pp_type typ)
 ;;
 
 type error =
@@ -92,16 +95,23 @@ let pp_error fmt err =
   match err with
   | OccursCheck -> fprintf fmt "Occurs check failed"
   | MismatchValues (t1, t2) ->
-    fprintf fmt "This pattern matches values of type ";
-    pp_type fmt t1;
-    fprintf fmt " but a pattern was expected which matches values of type ";
-    pp_type fmt t2
+    fprintf
+      fmt
+      "This pattern matches values of type %a but a pattern was expected which matches \
+       values of type %a"
+      pp_type
+      t1
+      pp_type
+      t2
   | UnboundValue identifier -> fprintf fmt "Unbound value %s" identifier
   | UnificationFailed (t1, t2) ->
-    fprintf fmt "This expression has type ";
-    pp_type fmt t1;
-    fprintf fmt " but an expression was expected of ";
-    pp_type fmt t2
+    fprintf
+      fmt
+      "This expression has type %a but an expression was expected of %a"
+      pp_type
+      t1
+      pp_type
+      t2
   | ParserAvoidedError ->
     fprintf
       fmt

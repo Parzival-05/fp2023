@@ -1,7 +1,3 @@
-(** Copyright 2023-2024, David Akhmedov *)
-
-(** SPDX-License-Identifier: LGPL-3.0-or-later *)
-
 module type MONAD_FAIL = sig
   type ('a, 'e) t
 
@@ -63,7 +59,7 @@ type error =
 val pp_value : Format.formatter -> value -> unit
 val print_value : value -> unit
 val pp_error : Format.formatter -> error -> unit
-val print_error : error -> unit
+val print_error : Format.formatter -> error -> unit
 
 module Environment : functor (M : MONAD_FAIL) -> sig
   val find : (string, 'a, 'b) Base.Map.t -> string -> ('a, error) M.t
