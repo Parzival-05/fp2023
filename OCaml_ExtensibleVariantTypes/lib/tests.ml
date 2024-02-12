@@ -217,14 +217,14 @@ module InferenceTests = struct
               | [] -> acc
               | (h :: tl) -> (h :: acc) 
             in helper [] l |};
-    [%expect {| val reverse : 'h list -> 'h list |}]
+    [%expect {| val reverse : 'a list -> 'a list |}]
   ;;
 
   let%expect_test _ =
     infer_test {|  let rec fix f = f (fix f) 
       |};
     [%expect {| 
-          val fix : ('d -> 'd) -> 'd
+          val fix : ('a -> 'a) -> 'a
     |}]
   ;;
 
@@ -232,7 +232,7 @@ module InferenceTests = struct
     infer_test {|  let rec fix f x = f (fix f) x 
       |};
     [%expect {| 
-          val fix : (('c -> 'f) -> 'c -> 'f) -> 'c -> 'f
+          val fix : (('a -> 'b) -> 'a -> 'b) -> 'a -> 'b
     |}]
   ;;
 
@@ -359,7 +359,7 @@ module InferenceTests = struct
         match lst with 
           | [] -> []
           | (x::xs) -> f x :: map f xs |};
-    [%expect {| val map : ('e -> 'f) -> 'e list -> 'f list |}]
+    [%expect {| val map : ('a -> 'b) -> 'a list -> 'b list |}]
   ;;
 end
 
@@ -422,7 +422,7 @@ module InterpretTests = struct
       {| 
         val a : int = 5
         val fst : 'a * 'b -> 'a = <fun>
-        val snd : 'c * 'd -> 'd = <fun>
+        val snd : 'a * 'b -> 'b = <fun>
       |}]
   ;;
 end

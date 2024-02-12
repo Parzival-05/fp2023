@@ -9,9 +9,9 @@
   val res : int * int * int * bool = (10, 3628800, 34, false)
 
   $ dune exec lists_demo
-  val fold_left : ('e -> 'f -> 'e) -> 'e -> 'f list -> 'e = <fun>
+  val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a = <fun>
   val init : int -> int list -> int list = <fun>
-  val map : ('\141 -> '\142) -> '\141 list -> '\142 list = <fun>
+  val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
   val map_square : int list -> int list -> int list = <fun>
   val next_number : int -> (int * int) list = <fun>
   val numbers : int list = [10; 9; 8; 7; 6; 5; 4; 3; 2; 1]
@@ -29,15 +29,15 @@
   1
   val a : int = 6
   val fac : int -> int = <fun>
-  val fac_cps : int -> (int -> 'h) -> 'h = <fun>
+  val fac_cps : int -> (int -> 'a) -> 'a = <fun>
   val fac_test : int = 5040
-  val id : '\133 -> '\133 = <fun>
-  val map : ('\147 -> '\146) -> '\147 list -> '\146 list = <fun>
-  val map_cps : ('z -> '{) -> 'z list -> ('{ list -> 'y) -> 'y = <fun>
+  val id : 'a -> 'a = <fun>
+  val map : ('a -> 'b) -> 'a list -> 'b list = <fun>
+  val map_cps : ('a -> 'b) -> 'a list -> ('b list -> 'c) -> 'c = <fun>
   val map_test : int list = [2; 3; 4; 5; 6]
   val print_int : int = 5
   val sumlist : int list -> int = <fun>
-  val sumlist_cps : int list -> (int -> 'l) -> 'l = <fun>
+  val sumlist_cps : int list -> (int -> 'a) -> 'a = <fun>
   val sumlist_test : int = 116
 
 
