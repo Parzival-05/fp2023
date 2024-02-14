@@ -172,9 +172,19 @@ end = struct
             | UnboundValue _ ->
               (match id with
                | "print_int" ->
-                 return @@ VFun ([ PId "x" ], EStd id, Not_recursive, environment)
+                 return
+                 @@ VFun
+                      ( [ PId "VALUE_FOR_STD_FUNS" ]
+                      , EConst CUnit
+                      , Not_recursive
+                      , environment )
                | "print_newline" ->
-                 return @@ VFun ([ PId "x" ], EStd id, Not_recursive, environment)
+                 return
+                 @@ VFun
+                      ( [ PId "VALUE_FOR_STD_FUNS" ]
+                      , EConst CUnit
+                      , Not_recursive
+                      , environment )
                | _ -> fail error)
             | _ -> fail error)
       in
@@ -202,22 +212,13 @@ end = struct
             (match tl with
              | [] ->
                let _ =
-                 match expr with
-                 | EStd x ->
-                   (match x with
-                    | "print_int" ->
-                      (match arg_val with
-                       | VInt n ->
-                         let _ = print_int n in
-                         return ()
-                       | _ -> fail TypeError)
-                    | "print_newline" ->
-                      (match arg_val with
-                       | VUnit ->
-                         let _ = print_newline () in
-                         return ()
-                       | _ -> fail TypeError)
-                    | _ -> fail UnexpectedState)
+                 match func, arg_val, hd with
+                 | EId "print_int", VInt n, PId "VALUE_FOR_STD_FUNS" ->
+                   let _ = print_int n in
+                   return ()
+                 | EId "print_newline", VUnit, PId "VALUE_FOR_STD_FUNS" ->
+                   let _ = print_newline () in
+                   return ()
                  | _ -> return ()
                in
                eval expr updated_env
@@ -268,11 +269,6 @@ end = struct
         | [] -> fail NonExhaustivePatternMatching
       in
       check_patterns cases
-    | EStd x ->
-      (match x with
-       | "print_int" -> return VUnit
-       | "print_newline" -> return VUnit
-       | _ -> fail UnexpectedState)
   ;;
 
   let run (program : decl list) =
