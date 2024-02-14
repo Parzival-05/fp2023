@@ -62,7 +62,6 @@ type expr =
   | EClsr of decl * expr (** Closure. Examples: let inc x = x + 1 in inc 5*)
   | EMatch of expr * (pattern * expr) list
   (** Matching. Examples: match l with | hd::tl -> hd | _ -> [] *)
-  | EStd of ident (** Std functions (only for print) *)
 [@@deriving eq, show { with_path = false }]
 
 and decl = DLet of rec_flag * ident * expr (** Let declarations *)
