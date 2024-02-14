@@ -371,7 +371,6 @@ let rec infer env = function
     let* subst_e, typ_e = infer env e in
     let* type_variable = fresh_var in
     check_cases type_variable typ_e subst_e patmatch
-  | EStd x -> lookup_env x env
 
 and infer_decl env = function
   | DLet (Not_recursive, id, expr) ->
