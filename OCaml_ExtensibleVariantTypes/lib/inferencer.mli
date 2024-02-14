@@ -220,5 +220,4 @@ val run_inference
   -> ((string, scheme, Base.String.comparator_witness) Base.Map.t, Typing.error) result
 
 val is_printable : string -> Typing.typ -> bool
-val edit_numbers_in_typ : Typing.typ -> Typing.typ
 val print_env : ((string, 'a * Typing.typ, 'b) Base.Map.t, Typing.error) result -> unit

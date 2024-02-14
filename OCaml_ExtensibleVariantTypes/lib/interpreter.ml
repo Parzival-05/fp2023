@@ -323,7 +323,7 @@ let run_and_pp s =
                     pp_value
                     value
                 in
-                printf "%a" pp_result (key, Inferencer.edit_numbers_in_typ typ, data))
+                printf "%a" pp_result (key, typ, data))
               else ())
         | Error err ->
           let pp_error fmt err =

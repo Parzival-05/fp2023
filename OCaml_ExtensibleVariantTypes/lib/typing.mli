@@ -27,6 +27,7 @@ val tarrow : typ -> typ -> typ
 val ttuple : typ list -> typ
 val tlist : typ -> typ
 val tvar : type_variable_number -> typ
+val edit_numbers_in_typ : typ -> typ
 val pp_type : Format.formatter -> typ -> unit
 val print_typ : Format.formatter -> ?carriage:bool -> typ -> unit
 

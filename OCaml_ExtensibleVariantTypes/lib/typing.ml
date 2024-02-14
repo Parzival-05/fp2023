@@ -74,11 +74,47 @@ let rec pp_type fmt typ =
     fprintf fmt (arrow typ_left ^^ " -> %a") pp_type typ_left pp_type typ_right
 ;;
 
+let edit_numbers_in_typ typ =
+  let empty = Base.Map.empty (module Base.Int) in
+  let add map old_n new_n = Base.Map.update map old_n ~f:(fun _ -> new_n) in
+  let lookup map key = Base.Map.find map key in
+  let rec helper typ total map =
+    match typ with
+    | TVar x ->
+      let n, total, map =
+        match lookup map x with
+        | None -> total, total + 1, add map x total
+        | Some n -> n, total, map
+      in
+      TVar n, total, map
+    | TGround _ -> typ, total, map
+    | TTuple xs ->
+      let res, total, map =
+        List.fold_left
+          (fun (acc, total, map) typ ->
+            let typ, total, map = helper typ total map in
+            typ :: acc, total, map)
+          ([], total, map)
+          xs
+      in
+      TTuple (List.rev res), total, map
+    | TList ltyp ->
+      let res, total, map = helper ltyp total map in
+      TList res, total, map
+    | TArr (l, r) ->
+      let res_l, total, map = helper l total map in
+      let res_r, total, map = helper r total map in
+      TArr (res_l, res_r), total, map
+  in
+  let typ, _, _ = helper typ 0 empty in
+  typ
+;;
+
 let print_typ fmt ?(carriage = false) typ =
   Format.fprintf
     fmt
     ("%s" ^^ if carriage then "\n" else "")
-    (Format.asprintf "%a" pp_type typ)
+    (Format.asprintf "%a" pp_type (edit_numbers_in_typ typ))
 ;;
 
 type error =
