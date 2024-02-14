@@ -97,6 +97,7 @@ end = struct
        | CBool n1, VBool n2 when n1 = n2 -> return env
        | CBool _, VBool _ -> fail NonExhaustivePatternMatching
        | CNil, VList [] -> return env
+       | CNil, VList _ -> fail NonExhaustivePatternMatching
        | _ -> fail TypeError)
     | PList (hd, tl), VList (hd_v :: tl_v) ->
       let* env = update_env hd hd_v env in
