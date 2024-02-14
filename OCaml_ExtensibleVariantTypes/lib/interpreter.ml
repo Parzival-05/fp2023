@@ -101,15 +101,11 @@ end = struct
     | PList (hd, tl), VList (hd_v :: tl_v) ->
       let* env = update_env hd hd_v env in
       update_env tl (VList tl_v) env
-    | PTuple (hd :: []), VTuple (hd_v :: []) ->
-      let* env = update_env hd hd_v env in
-      return env
     | PTuple (hd :: tl), VTuple (hd_v :: tl_v) ->
-      if tl = [] || tl_v = []
-      then fail NonExhaustivePatternMatching
-      else
-        let* env = update_env hd hd_v env in
-        update_env (PTuple tl) (VTuple tl_v) env
+      let* env = update_env hd hd_v env in
+      if tl = [] && tl_v = []
+      then return env
+      else update_env (PTuple tl) (VTuple tl_v) env
     | _ -> fail NonExhaustivePatternMatching
 
   and eval_decl environment = function
