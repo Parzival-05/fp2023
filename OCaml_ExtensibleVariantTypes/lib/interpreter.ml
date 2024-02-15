@@ -32,6 +32,7 @@ type error =
   | NonExhaustivePatternMatching
   | TypeError
   | UnexpectedState (** Unexpected state related to standard functions *)
+  | TupleOfLengthLT2 (** Tuple of length less than 2 *)
 
 open Format
 
@@ -64,6 +65,7 @@ let pp_error fmt = function
       "Use the parser to get the AST: the parser does some transformations of expressions"
   | TypeError -> fprintf fmt "Use type checking"
   | UnexpectedState -> fprintf fmt "Unexpected state related to standard functions"
+  | TupleOfLengthLT2 -> fprintf fmt "Tuple of length less than 2"
 ;;
 
 let print_error fmt = fprintf fmt "%a" pp_error
@@ -102,11 +104,21 @@ end = struct
     | PList (hd, tl), VList (hd_v :: tl_v) ->
       let* env = update_env hd hd_v env in
       update_env tl (VList tl_v) env
-    | PTuple (hd :: tl), VTuple (hd_v :: tl_v) ->
-      let* env = update_env hd hd_v env in
-      if tl = [] && tl_v = []
-      then return env
-      else update_env (PTuple tl) (VTuple tl_v) env
+    | PTuple pats, VTuple values ->
+      if List.length pats <= 1 || List.length values <= 1
+      then fail TupleOfLengthLT2
+      else
+        let* zipped_list =
+          match Base.List.zip pats values with
+          | Base.List.Or_unequal_lengths.Unequal_lengths -> fail TypeError
+          | Base.List.Or_unequal_lengths.Ok zipped_list -> return zipped_list
+        in
+        List.fold_left
+          (fun acc (p, v) ->
+            let* env = acc in
+            update_env p v env)
+          (return env)
+          zipped_list
     | _ -> fail NonExhaustivePatternMatching
 
   and eval_decl environment = function

@@ -59,6 +59,7 @@ type error =
   | NonExhaustivePatternMatching
   | TypeError
   | UnexpectedState
+  | TupleOfLengthLT2
 
 val pp_value : Format.formatter -> value -> unit
 val print_value : value -> unit
