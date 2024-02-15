@@ -173,29 +173,13 @@ end = struct
           | _, _ -> fail UnsupportedOperation))
     | EId id ->
       let* res =
-        run
-          (find environment id)
-          ~ok:(fun res -> return res)
-          ~err:(fun error ->
-            match error with
-            | UnboundValue _ ->
-              (match id with
-               | "print_int" ->
-                 return
-                 @@ VFun
-                      ( [ PId "VALUE_FOR_STD_FUNS" ]
-                      , EConst CUnit
-                      , Not_recursive
-                      , environment )
-               | "print_newline" ->
-                 return
-                 @@ VFun
-                      ( [ PId "VALUE_FOR_STD_FUNS" ]
-                      , EConst CUnit
-                      , Not_recursive
-                      , environment )
-               | _ -> fail error)
-            | _ -> fail error)
+        run (find environment id) ~ok:return ~err:(fun error ->
+          match error, id with
+          | UnboundValue _, ("print_int" | "print_newline") ->
+            return
+            @@ VFun
+                 ([ PId "VALUE_FOR_STD_FUNS" ], EConst CUnit, Not_recursive, environment)
+          | _ -> fail error)
       in
       return
         (match res with
@@ -212,27 +196,25 @@ end = struct
       return (VFun (List.rev pat_list, function_body, Not_recursive, environment))
     | EApp (func, arg) ->
       let* func_val = eval func environment in
-      let* arg_val = eval arg environment in
       (match func_val with
-       | VFun (pat_list, expr, rec_flag, env) ->
-         (match pat_list with
-          | hd :: tl ->
-            let* updated_env = update_env hd arg_val env in
-            (match tl with
-             | [] ->
-               let _ =
-                 match func, arg_val, hd with
-                 | EId "print_int", VInt n, PId "VALUE_FOR_STD_FUNS" ->
-                   let _ = print_int n in
-                   return ()
-                 | EId "print_newline", VUnit, PId "VALUE_FOR_STD_FUNS" ->
-                   let _ = print_newline () in
-                   return ()
-                 | _ -> return ()
-               in
-               eval expr updated_env
-             | _ -> return @@ VFun (tl, expr, rec_flag, updated_env))
-          | [] -> fail TypeError)
+       | VFun (hd_pat :: tl_pat, expr, rec_flag, env) ->
+         let* arg_val = eval arg environment in
+         let* updated_env = update_env hd_pat arg_val env in
+         (match tl_pat with
+          | [] ->
+            let _ =
+              (* handler of std functions *)
+              match func, arg_val, hd_pat with
+              | EId "print_int", VInt n, PId "VALUE_FOR_STD_FUNS" ->
+                let _ = print_int n in
+                return ()
+              | EId "print_newline", VUnit, PId "VALUE_FOR_STD_FUNS" ->
+                let _ = print_newline () in
+                return ()
+              | _ -> return ()
+            in
+            eval expr updated_env
+          | _ -> return @@ VFun (tl_pat, expr, rec_flag, updated_env))
        | _ -> fail TypeError)
     | EIf (cond, thn, els) ->
       let* value = eval cond environment in
