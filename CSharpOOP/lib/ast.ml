@@ -1,4 +1,4 @@
-(** Copyright 2021-2023, Julia Kononova *)
+(** Copyright 2023-2024, Julia Kononova *)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
@@ -7,39 +7,24 @@ type value =
   | VChar of char
   | VBool of bool
   | VString of string
-  | NULL (** Null value*)
-[@@deriving show { with_path = false }, eq]
-
-type ref_type =
-  | TString
-  | TClass
-  | TInterface
-[@@deriving show { with_path = false }, eq]
-
-type base_type =
-  | TInt
-  | TChar
-  | TBool
-[@@deriving show { with_path = false }, eq]
-
-type not_nullable_type =
-  | TBase of base_type
-  | TRef of ref_type
-[@@deriving show { with_path = false }, eq]
-
-type type_ =
-  | TNot_nullable_type of not_nullable_type
-  | TNullable_type of base_type
-[@@deriving show { with_path = false }, eq]
-
-type var_type = TVar of type_ [@@deriving show { with_path = false }, eq]
-
-type meth_type =
-  | TVoid (** type [void] for methods *)
-  | TRetrun of type_
 [@@deriving show { with_path = false }, eq]
 
 type name = Name of string [@@deriving show { with_path = false }, eq]
+
+type typ =
+  | TInt
+  | TChar
+  | TBool
+  | TString
+  | TObj of name
+[@@deriving show { with_path = false }, eq]
+
+type var_type = TVar of typ [@@deriving show { with_path = false }, eq]
+
+type meth_type =
+  | TVoid (** type [void] for methods *)
+  | TRetrun of typ
+[@@deriving show { with_path = false }, eq]
 
 type access_modifier =
   | Public
@@ -47,18 +32,10 @@ type access_modifier =
   | Private
 [@@deriving show { with_path = false }, eq]
 
-type field_modifier =
-  | New
-  | FAccess of access_modifier
-[@@deriving show { with_path = false }, eq]
-
-type class_modifier = CAccess of access_modifier
-[@@deriving show { with_path = false }, eq]
-
-type method_modifier =
-  | MAccess of access_modifier
-  | Static
+type poly_modifier =
   | Override
+  | Virtual
+  | MNew
 [@@deriving show { with_path = false }, eq]
 
 type bin_op =
@@ -81,16 +58,18 @@ type bin_op =
 type un_op =
   | Not (** ! *)
   | Minus (** - *)
+  | New (** new *)
 [@@deriving show { with_path = false }, eq]
 
-type expr =
+type args = Args of expr list
+
+and expr =
   | Exp_Const of value
   | Bin_op of bin_op * expr * expr
   | Un_op of un_op * expr
   | Access_By_Point of expr * expr (**  Access by point to class member [a.b.c]*)
   | Exp_Name of name
-  | Exp_Args of expr list
-  | Method_invoke of expr * expr (** Calling a method [Foo.a(i, 9)] *)
+  | Method_invoke of expr * args (** Calling a method [Foo.a(i, 9)] *)
 [@@deriving show { with_path = false }, eq]
 
 type var_declaration =
@@ -104,25 +83,40 @@ type statement =
   | Decl of var_declaration * expr option
   (** Declare and assign a value to a variable [int a = 1]*)
   | If of expr * statement * statement option
+  | For of statement option * expr option * expr option * statement
+  | While of expr * statement
   | Return of expr option
-  | Body of statement list
+  | Body of statement list (* add Instance constructor invocation -- new T(x, y)*)
 [@@deriving show { with_path = false }, eq]
 
-type field = Field of field_modifier list option * var_type * name
+type field =
+  { f_modifier : access_modifier option
+  ; f_type : var_type
+  ; f_name : name
+  }
 [@@deriving show { with_path = false }, eq]
 
-type methods = Method of method_modifier list option * meth_type * name * params
+type methods =
+  { m_acc_modifier : access_modifier option
+  ; m_poly_modifier : poly_modifier option
+  ; m_type : meth_type
+  ; m_name : name
+  ; m_params : params
+  }
 [@@deriving show { with_path = false }, eq]
 
-type field_sign = Field_Sign of field * expr option
-[@@deriving show { with_path = false }, eq]
-
-type method_sign = Method_Sign of methods * statement
+type constructor =
+  { c_modifier : access_modifier option
+  ; c_name : name
+  ; c_params : params
+  ; c_base : args option
+  }
 [@@deriving show { with_path = false }, eq]
 
 type member =
-  | CField of field_sign
-  | CMethod of method_sign
+  | CField of field * expr option
+  | CMethod of methods * statement
+  | CConstructor of constructor * statement
 [@@deriving show { with_path = false }, eq]
 
 type i_member =
@@ -131,8 +125,8 @@ type i_member =
 [@@deriving show { with_path = false }, eq]
 
 type objects =
-  | Class of class_modifier list option * name * member list
-  | Interface of class_modifier option * name * i_member list
+  | Class of access_modifier option * name * name option * member list
+  | Interface of access_modifier option * name * name option * i_member list
 [@@deriving show { with_path = false }, eq]
 
-type program = Ast of objects list option [@@deriving show { with_path = false }, eq]
+type program = Ast of objects list [@@deriving show { with_path = false }, eq]
