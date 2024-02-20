@@ -8,7 +8,4 @@
 
 (cram
  (applies_to parsingTests)
- (deps
-  ./demoParse.exe
-  ;
-  ))
+ (deps ./demoParse.exe))

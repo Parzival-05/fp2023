@@ -1,4 +1,4 @@
-(** Copyright 2021-2023, Julia Kononova *)
+(** Copyright 2023-2024, Julia Kononova *)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
@@ -7,7 +7,7 @@ val s_declaration : Ast.statement Angstrom.t
 val s_if_else : Ast.statement Angstrom.t -> Ast.statement Angstrom.t
 val p_body : Ast.statement Angstrom.t
 val p_method : Ast.methods Angstrom.t
-val c_method : Ast.method_sign Angstrom.t
+val c_method : Ast.member Angstrom.t
 val p_field : Ast.field Angstrom.t
 val p_class : Ast.objects Angstrom.t
 val p_interface : Ast.objects Angstrom.t

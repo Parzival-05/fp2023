@@ -1,4 +1,4 @@
-(** Copyright 2021-2023, Julia Kononova *)
+(** Copyright 2023-2024, Julia Kononova *)
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
@@ -75,15 +75,8 @@ let p_bool =
   | false -> fail "This is not a bool"
 ;;
 
-let p_null =
-  read_word
-  >>= function
-  | "null" -> return NULL
-  | _ -> fail "This is not a null"
-;;
-
 let p_val =
-  space *> choice [ p_bool; p_char; p_integer; p_string; p_null ]
+  space *> choice [ p_bool; p_char; p_integer; p_string ]
   >>= fun v -> return (Exp_Const v)
 ;;
 
@@ -97,29 +90,12 @@ let p_name =
 ;;
 
 (* TYPES PARSE *)
-let p_q = space *> char '?' *> return true <|> return false
-
-let base_converter = function
+let type_converter = function
   | "bool" -> return TBool
   | "int" -> return TInt
   | "char" -> return TChar
-  | _ -> fail "This is not a base type"
-;;
-
-let p_base_t t =
-  p_q
-  >>= function
-  | true -> return (TNullable_type t)
-  | false -> return (TNot_nullable_type (TBase t))
-;;
-
-let t_base_q = read_word >>= fun str -> base_converter str >>= fun t -> p_base_t t
-
-let t_string =
-  read_word
-  >>= function
-  | "string" -> return (TNot_nullable_type (TRef TString))
-  | _ -> fail "This is not a string type"
+  | "string" -> return TString
+  | _ -> fail "This is not a type"
 ;;
 
 let t_void =
@@ -129,8 +105,8 @@ let t_void =
   | _ -> fail "This is not a void"
 ;;
 
-let t_type = choice [ t_base_q; t_string ]
-let t_val = t_type >>| fun vt -> TVar vt
+let t_type = read_word >>= fun str -> type_converter str
+let t_val = choice [ (t_type >>| fun vt -> TVar vt) ;p_name >>| (fun n -> TVar (TObj n)) ]
 let t_method = choice [ t_void; (t_type >>| fun mt -> TRetrun mt) ]
 
 (* EXPR PARSE *)
@@ -155,6 +131,8 @@ let log_or = return_bin_op "||" Or
 let assign = return_bin_op "=" Assign
 let minus = return_un_op "-" Minus
 let u_not = return_un_op "!" Not
+let u_new = return_un_op "new" New
+let chainl0 e op = lift2 (fun f x -> f x) op e <|> e
 
 let chainl1 e op =
   let rec go acc = lift2 (fun f x -> f acc x) op e >>= go <|> return acc in
@@ -173,15 +151,20 @@ let p_list e str =
 ;;
 
 let p_list1 e str = p_list e str <|> return []
-let e_name = p_name >>| fun n -> Exp_Name n
-let p_dot = read_str "." *> return (fun expr1 expr2 -> Access_By_Point (expr1, expr2))
-let e_access_by_point = chainr1 e_name p_dot
-let e_args e = parens @@ p_list1 e "," >>| fun e_l -> Exp_Args e_l
-let method_invoke e = lift2 (fun n a -> Method_invoke (n, a)) e_access_by_point (e_args e)
 
+let e_name = p_name >>= fun n -> return (Exp_Name n)
+let p_dot = read_str "." *> return (fun name expr -> Access_By_Point (name, expr))
+let e_access_by_point = chainr1 e_name p_dot
+let args e = parens @@ p_list1 e "," >>| fun e_l -> Args e_l
+let method_invoke e = lift2 (fun n a -> Method_invoke (n, a)) e_access_by_point (args e)
+
+(* TODO: приведение типов*)
+(* TODO: new methods *)
+(* мб as *)
 let e_op =
   fix (fun expr ->
     let expr = parens expr <|> p_val <|> method_invoke expr <|> e_name in
+    let expr = chainl0 expr (minus <|> u_not <|> u_new) in
     let expr = chainl1 expr (mul <|> div <|> bmod) in
     let expr = chainl1 expr (add <|> sub) in
     let expr = chainl1 expr (less_or_eq <|> more_or_eq <|> less <|> more) in
@@ -223,6 +206,33 @@ let s_if_else body =
     lift3 (fun i t e -> If (i, t, e)) p_if_cond body (p_else body if_else))
 ;;
 
+let p_for_sections =
+  let for_initializer = s_declaration >>| (fun init -> Some init) <|> return None in
+  let for_cond_iter = e_op >>| (fun expr -> Some expr) <|> return None in
+  lift3
+    (fun init cond iter -> init, cond, iter)
+    (for_initializer <* p_space (char ';'))
+    (for_cond_iter <* p_space (char ';'))
+    for_cond_iter
+;;
+
+let p_for =
+  read_word
+  >>= function
+  | "for" -> parens p_for_sections
+  | _ -> fail "This is not FOR word"
+;;
+
+let s_for body = lift2 (fun (init, cond, iter) b -> For (init, cond, iter, b)) p_for body
+
+let p_while =
+  read_word
+  >>= function
+  | "while" -> parens e_op
+  | _ -> fail "This is not WHILE word"
+;;
+
+let s_while body = lift2 (fun e b -> While (e, b)) p_while body
 let semicolon = fix (fun sem -> read_str ";" *> sem <|> return ())
 let semicolon1 = read_str ";" *> semicolon
 
@@ -234,6 +244,8 @@ let p_body =
       ; method_expr <* semicolon1
       ; p_return <* semicolon1
       ; s_if_else b <* semicolon
+      ; s_for b <* semicolon
+      ; s_while b <* semicolon
       ]
   in
   fix (fun body -> read_body @@ e_choice body <* space)
@@ -246,41 +258,21 @@ let p_access_modifier = function
   | _ -> fail "Is not an access modifier"
 ;;
 
-let modifier_list p = many p >>= fun l -> return (Some l) <|> return None
-
-let p_m_modifier_list =
-  let p_m_modifier =
-    read_word
-    >>= fun str ->
-    match str with
-    | "static" -> return Static
-    | "override" -> return Override
-    | _ -> p_access_modifier str >>= fun m -> return (MAccess m)
-  in
-  modifier_list p_m_modifier
+let p_poly_modifier = function
+  | "override" -> return Override
+  | "virtual" -> return Virtual
+  | "new" -> return MNew
+  | _ -> fail "Is not an polymorphism modifier"
 ;;
 
-let p_f_modifier_list =
-  let p_f_modifier =
-    read_word
-    >>= fun str ->
-    match str with
-    | "new" -> return New
-    | _ -> p_access_modifier str >>= fun m -> return (FAccess m)
-  in
-  modifier_list p_f_modifier
+let modifier_opt f = read_word >>= f >>= (fun m -> return (Some m)) <|> return None
+let access_modifier_opt = modifier_opt p_access_modifier
+
+let p_meth_modifier =
+  lift2 (fun a p -> a, p) access_modifier_opt (modifier_opt p_poly_modifier)
 ;;
 
-let p_c_modifier_list =
-  let p_c_modifier = read_word >>= p_access_modifier >>= fun m -> return (CAccess m) in
-  modifier_list p_c_modifier
-;;
-
-let p_i_modifier_list =
-  read_word >>= p_access_modifier >>= (fun m -> return (Some (CAccess m))) <|> return None
-;;
-
-let p_m_name_args =
+let p_m_name_params =
   lift2
     (fun n l -> n, l)
     p_name
@@ -288,17 +280,45 @@ let p_m_name_args =
 ;;
 
 let p_method =
-  lift3 (fun p i (d, o) -> Method (p, i, d, o)) p_m_modifier_list t_method p_m_name_args
+  lift3
+    (fun (m_acc_modifier, m_poly_modifier) m_type (m_name, m_params) ->
+      { m_acc_modifier; m_poly_modifier; m_type; m_name; m_params })
+    p_meth_modifier
+    t_method
+    p_m_name_params
 ;;
 
-let c_method = lift2 (fun m b -> Method_Sign (m, b)) p_method p_body
+let c_method = lift2 (fun m b -> CMethod (m, b)) p_method p_body
 
 let assign_option =
   p_space @@ (read_str "=" *> expression) >>= (fun x -> return (Some x)) <|> return None
 ;;
 
-let p_field = lift3 (fun m t n -> Field (m, t, n)) p_f_modifier_list t_val p_name
-let c_field = lift2 (fun f e -> Field_Sign (f, e)) p_field assign_option
+let p_field =
+  lift3
+    (fun f_modifier f_type f_name -> { f_modifier; f_type; f_name })
+    access_modifier_opt
+    t_val
+    p_name
+;;
+
+let c_field = lift2 (fun f e -> CField (f, e)) p_field assign_option
+
+let base =
+  read_str ":" *> read_str "base" *> args e_op
+  >>= (fun b -> return (Some b))
+  <|> return None
+;;
+
+let constructor =
+  lift3
+    (fun c_modifier (c_name, c_params) c_base -> { c_modifier; c_name; c_params; c_base })
+    access_modifier_opt
+    p_m_name_params
+    base
+;;
+
+let c_constructor = lift2 (fun c b -> CConstructor (c, b)) constructor p_body
 
 let read_class_name =
   read_word
@@ -307,25 +327,29 @@ let read_class_name =
   | _ -> fail "This is not a class"
 ;;
 
+let parent = read_str ":" *> p_name >>= (fun p -> return (Some p)) <|> return None
+
 let class_members =
   let member =
-    choice
-      [ c_field >>| (fun f -> CField f) <* semicolon1
-      ; c_method >>| (fun m -> CMethod m) <* semicolon
-      ]
+    choice [ c_field <* semicolon1; c_method <* semicolon; c_constructor <* semicolon ]
   in
   parens2 @@ (many member <|> return []) <* space
 ;;
 
 let p_class =
-  lift3 (fun m n mem -> Class (m, n, mem)) p_c_modifier_list read_class_name class_members
+  lift4
+    (fun m n p mem -> Class (m, n, p, mem))
+    access_modifier_opt
+    read_class_name
+    parent
+    class_members
 ;;
 
 let read_interface_name =
   read_word
   >>= function
   | "interface" -> p_name
-  | _ -> fail "This is not a class"
+  | _ -> fail "This is not a interface"
 ;;
 
 let intrface_members =
@@ -339,16 +363,17 @@ let intrface_members =
 ;;
 
 let p_interface =
-  lift3
-    (fun m n mem -> Interface (m, n, mem))
-    p_i_modifier_list
+  lift4
+    (fun m n p mem -> Interface (m, n, p, mem))
+    access_modifier_opt
     read_interface_name
+    parent
     intrface_members
 ;;
 
 let p_ast =
   let obj_choice = choice [ p_class; p_interface ] in
-  many obj_choice >>| (fun o -> Ast (Some o)) <|> return (Ast None)
+  many obj_choice >>| fun o -> Ast o
 ;;
 
 (* PARSERS *)
