@@ -7,11 +7,13 @@ type error =
   | No_variable of string
   | Mismatch
   | Other of string
+  | Impossible_result
 
 let pp_error ppf : error -> _ = function
   | Occurs_check -> Format.fprintf ppf "Occurs check failed"
   | No_variable x -> Format.fprintf ppf "Undefined variable '%s'" x
   | Mismatch -> Format.fprintf ppf "Mismatch"
+  | Impossible_result -> Format.fprintf ppf "Impossible result"
   | Other x -> Format.fprintf ppf "%s" x
 ;;
 
@@ -71,7 +73,17 @@ module Monad_SE = struct
   let write : 'st -> ('st, unit) t = fun new_st _ -> new_st, Result.Ok ()
   let run : ('st, 'a) t -> 'st -> 'st * ('a, error) Result.t = fun f st -> f st
 
-  (* TODO: let iter : *)
+  let map : ('a -> ('st, 'b) t) -> 'a list -> ('st, 'b list) t =
+    fun f list ->
+    let f acc el = acc >>= fun acc -> f el >>= fun el -> return (el :: acc) in
+    List.fold_left f (return []) list >>| List.rev
+  ;;
+
+  let iter : ('a -> ('st, unit) t) -> 'a list -> ('st, unit) t =
+    fun f list ->
+    let f acc el = acc *> f el *> return () in
+    List.fold_left f (return ()) list
+  ;;
 end
 
 module Monad_TypeCheck = struct
@@ -82,25 +94,98 @@ module Monad_TypeCheck = struct
 
   type 'a t = (TypeCheck.st_type_check, 'a) Monad_SE.t
 
-  let return_s_n = function
+  let return_with_fail = function
     | Some x -> return x
     | None -> fail Occurs_check
   ;;
 
-  let read_local_el name =
+  let read_local : 'a MapName.t t =
     read
     >>= function
-    | _, l, _, _ -> MapName.find_opt name l |> return_s_n
+    | _, l, _, _, _ -> return l
   ;;
 
-    let read_global_el name =
+  let read_local_el name f = read_local >>= fun l -> MapName.find_opt name l |> f
+  let read_local_el_opt name = read_local_el name return
+  let read_local_el name = read_local_el name return_with_fail
+
+  let read_global : 'a MapName.t t =
     read
     >>= function
-    | g, _, _, _ -> MapName.find_opt name g |> return_s_n
-  ;; 
+    | g, _, _, _, _ -> return g
+  ;;
+
+  let read_global_el name f = read_global >>= fun g -> MapName.find_opt name g |> f
+  let read_global_el_opt name = read_global_el name return
+  let read_global_el name = read_global_el name return_with_fail
+
   let get_cur_class_name : cur_class_name t =
     read
     >>= function
-    | _, _, n, _ -> return n
+    | _, _, Some n, _, _ -> return n
+    | _ -> fail Impossible_result
+  ;;
+
+  let read_meth_type : meth_type option t =
+    read
+    >>= function
+    | _, _, _, m_t, _ -> return m_t
+  ;;
+
+  let read_main_class : class_with_main_method option t =
+    read
+    >>= function
+    | _, _, _, _, main -> return main
+  ;;
+
+  let write_local n_l =
+    read
+    >>= function
+    | g, _, n, m, main -> write (g, n_l, n, m, main)
+  ;;
+
+  let write_local_el el_name el_ctx =
+    read_local >>= fun l -> write_local (MapName.add el_name el_ctx l)
+  ;;
+
+  let write_meth_type_opt m_t =
+    read
+    >>= function
+    | g, l, n, _, main -> write (g, l, n, m_t, main)
+  ;;
+
+  let write_meth_type m_t = write_meth_type_opt (Some m_t)
+
+  let write_main_class main =
+    read
+    >>= function
+    | g, l, n, m_t, _ -> write (g, l, n, m_t, main)
+  ;;
+
+  let write_global n_g =
+    read
+    >>= function
+    | _, l, n, m, main -> write (n_g, l, n, m, main)
+  ;;
+
+  let write_global_el el_name el_ctx =
+    read_global >>= fun g -> write_global (MapName.add el_name el_ctx g)
+  ;;
+
+  let write_cur_class_name n =
+    read
+    >>= function
+    | g, l, _, t, main -> write (g, l, Some n, t, main)
   ;;
 end
+
+(*
+   module Monad_Interpreter = struct
+   open Ast
+   open State_type.St_Interpreter
+   open State_type
+   include Monad_SE
+
+   type 'a t = (St_Interpreter.st_interpreter, 'a) Monad_SE.t
+
+   end *)

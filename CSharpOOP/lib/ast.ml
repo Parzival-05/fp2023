@@ -33,6 +33,7 @@ type access_modifier =
 [@@deriving show { with_path = false }, eq]
 
 type poly_modifier =
+  | Static
   | Override
   | Virtual
   | MNew
@@ -124,9 +125,25 @@ type i_member =
   | IMethod of methods
 [@@deriving show { with_path = false }, eq]
 
+type obj_class =
+  { cl_modifier : access_modifier option
+  ; cl_name : name
+  ; cl_parent : name option
+  ; cl_body : member list
+  }
+[@@deriving show { with_path = false }, eq]
+
+type interface =
+  { i_modifier : access_modifier option
+  ; i_name : name
+  ; i_parent : name option
+  ; i_body : i_member list
+  }
+[@@deriving show { with_path = false }, eq]
+
 type objects =
-  | Class of access_modifier option * name * name option * member list
-  | Interface of access_modifier option * name * name option * i_member list
+  | Class of obj_class
+  | Interface of interface
 [@@deriving show { with_path = false }, eq]
 
 type program = Ast of objects list [@@deriving show { with_path = false }, eq]

@@ -107,8 +107,8 @@ let%expect_test _ =
     \        else \n\
     \        {\n\
     \            return num * Fac(num - 1);\n\
-    \        }\n\
-    \    }";
+    \        };\n\
+    \        }";
   [%expect
     {|
       (CMethod (
@@ -154,88 +154,97 @@ let%expect_test _ =
      }";
   [%expect
     {|
-  (Class (None, (Name "Test"), None,
-     [(CMethod (
-         { m_acc_modifier = None; m_poly_modifier = None;
-           m_type = (TRetrun TInt); m_name = (Name "Fac");
-           m_params = (Params [(Var_Declaration ((TVar TInt), (Name "num")))])
-           },
-         (Body
-            [(If (
-                (Bin_op (Equal, (Exp_Name (Name "num")), (Exp_Const (VInt 1)))),
-                (Body [(Return (Some (Exp_Const (VInt 1))))]),
-                (Some (Body
-                         [(Return
-                             (Some (Bin_op (Asterisk, (Exp_Name (Name "num")),
-                                      (Method_invoke ((Exp_Name (Name "Fac")),
-                                         (Args
-                                            [(Bin_op (Dash,
-                                                (Exp_Name (Name "num")),
-                                                (Exp_Const (VInt 1))))
-                                              ])
-                                         ))
-                                      ))))
-                           ]))
-                ))
-              ])
-         ))
-       ]
-     )) |}]
+  (Class
+     { cl_modifier = None; cl_name = (Name "Test"); cl_parent = None;
+       cl_body =
+       [(CMethod (
+           { m_acc_modifier = None; m_poly_modifier = None;
+             m_type = (TRetrun TInt); m_name = (Name "Fac");
+             m_params =
+             (Params [(Var_Declaration ((TVar TInt), (Name "num")))]) },
+           (Body
+              [(If (
+                  (Bin_op (Equal, (Exp_Name (Name "num")), (Exp_Const (VInt 1))
+                     )),
+                  (Body [(Return (Some (Exp_Const (VInt 1))))]),
+                  (Some (Body
+                           [(Return
+                               (Some (Bin_op (Asterisk,
+                                        (Exp_Name (Name "num")),
+                                        (Method_invoke (
+                                           (Exp_Name (Name "Fac")),
+                                           (Args
+                                              [(Bin_op (Dash,
+                                                  (Exp_Name (Name "num")),
+                                                  (Exp_Const (VInt 1))))
+                                                ])
+                                           ))
+                                        ))))
+                             ]))
+                  ))
+                ])
+           ))
+         ]
+       }) |}]
 ;;
 
 let%expect_test _ =
   test_class
     "class Test {\n\
-    \  Person p = new Person();
-    \  int Sum(int num1, int num2) {\n\
+    \  Person p = new Person();\n\
+    \      int Sum(int num1, int num2) {\n\
     \    int a = num1;\n\
     \    int b = num2;\n\
     \    int a = a + b;\n\
     \    int b = a+6;\n\
-    \    Person p = new Person();
-    \    return a;\n\
-    \     }
-    }";
-  [%expect {|
-    (Class (None, (Name "Test"), None,
-       [(CField (
-           { f_modifier = None; f_type = (TVar (TObj (Name "Person")));
-             f_name = (Name "p") },
-           (Some (Un_op (New,
-                    (Method_invoke ((Exp_Name (Name "Person")), (Args []))))))
-           ));
-         (CMethod (
-            { m_acc_modifier = None; m_poly_modifier = None;
-              m_type = (TRetrun TInt); m_name = (Name "Sum");
-              m_params =
-              (Params
-                 [(Var_Declaration ((TVar TInt), (Name "num1")));
-                   (Var_Declaration ((TVar TInt), (Name "num2")))])
-              },
-            (Body
-               [(Decl ((Var_Declaration ((TVar TInt), (Name "a"))),
-                   (Some (Exp_Name (Name "num1")))));
-                 (Decl ((Var_Declaration ((TVar TInt), (Name "b"))),
-                    (Some (Exp_Name (Name "num2")))));
-                 (Decl ((Var_Declaration ((TVar TInt), (Name "a"))),
-                    (Some (Bin_op (Plus, (Exp_Name (Name "a")),
-                             (Exp_Name (Name "b")))))
-                    ));
-                 (Decl ((Var_Declaration ((TVar TInt), (Name "b"))),
-                    (Some (Bin_op (Plus, (Exp_Name (Name "a")),
-                             (Exp_Const (VInt 6)))))
-                    ));
-                 (Decl (
-                    (Var_Declaration ((TVar (TObj (Name "Person"))), (Name "p"))),
-                    (Some (Un_op (New,
-                             (Method_invoke ((Exp_Name (Name "Person")),
-                                (Args [])))
-                             )))
-                    ));
-                 (Return (Some (Exp_Name (Name "a"))))])
-            ))
-         ]
-       )) |}]
+    \    Person p = new Person();\n\
+    \        return a;\n\
+    \     }\n\
+    \    }";
+  [%expect
+    {|
+    (Class
+       { cl_modifier = None; cl_name = (Name "Test"); cl_parent = None;
+         cl_body =
+         [(CField (
+             { f_modifier = None; f_type = (TVar (TObj (Name "Person")));
+               f_name = (Name "p") },
+             (Some (Un_op (New,
+                      (Method_invoke ((Exp_Name (Name "Person")), (Args []))))))
+             ));
+           (CMethod (
+              { m_acc_modifier = None; m_poly_modifier = None;
+                m_type = (TRetrun TInt); m_name = (Name "Sum");
+                m_params =
+                (Params
+                   [(Var_Declaration ((TVar TInt), (Name "num1")));
+                     (Var_Declaration ((TVar TInt), (Name "num2")))])
+                },
+              (Body
+                 [(Decl ((Var_Declaration ((TVar TInt), (Name "a"))),
+                     (Some (Exp_Name (Name "num1")))));
+                   (Decl ((Var_Declaration ((TVar TInt), (Name "b"))),
+                      (Some (Exp_Name (Name "num2")))));
+                   (Decl ((Var_Declaration ((TVar TInt), (Name "a"))),
+                      (Some (Bin_op (Plus, (Exp_Name (Name "a")),
+                               (Exp_Name (Name "b")))))
+                      ));
+                   (Decl ((Var_Declaration ((TVar TInt), (Name "b"))),
+                      (Some (Bin_op (Plus, (Exp_Name (Name "a")),
+                               (Exp_Const (VInt 6)))))
+                      ));
+                   (Decl (
+                      (Var_Declaration ((TVar (TObj (Name "Person"))), (Name "p")
+                         )),
+                      (Some (Un_op (New,
+                               (Method_invoke ((Exp_Name (Name "Person")),
+                                  (Args [])))
+                               )))
+                      ));
+                   (Return (Some (Exp_Name (Name "a"))))])
+              ))
+           ]
+         }) |}]
 ;;
 
 (* ast tests*)
@@ -254,33 +263,35 @@ let%expect_test _ =
   [%expect
     {|
       (Ast
-         [(Class (None, (Name "Dog"), None,
-             [(CField (
-                 { f_modifier = (Some Public); f_type = (TVar TString);
-                   f_name = (Name "name") },
-                 (Some (Exp_Const (VString "Undefined")))));
-               (CField (
-                  { f_modifier = (Some Public); f_type = (TVar TInt);
-                    f_name = (Name "age") },
-                  None));
-               (CField (
-                  { f_modifier = None; f_type = (TVar TString);
-                    f_name = (Name "breed") },
-                  None));
-               (CMethod (
-                  { m_acc_modifier = (Some Public); m_poly_modifier = None;
-                    m_type = TVoid; m_name = (Name "bark"); m_params = (Params [])
-                    },
-                  (Body
-                     [(Expr
-                         (Method_invoke (
-                            (Access_By_Point ((Exp_Name (Name "Console")),
-                               (Exp_Name (Name "WriteLine")))),
-                            (Args [(Exp_Const (VString "Bark Bark !!"))]))))
-                       ])
-                  ))
-               ]
-             ))
+         [(Class
+             { cl_modifier = None; cl_name = (Name "Dog"); cl_parent = None;
+               cl_body =
+               [(CField (
+                   { f_modifier = (Some Public); f_type = (TVar TString);
+                     f_name = (Name "name") },
+                   (Some (Exp_Const (VString "Undefined")))));
+                 (CField (
+                    { f_modifier = (Some Public); f_type = (TVar TInt);
+                      f_name = (Name "age") },
+                    None));
+                 (CField (
+                    { f_modifier = None; f_type = (TVar TString);
+                      f_name = (Name "breed") },
+                    None));
+                 (CMethod (
+                    { m_acc_modifier = (Some Public); m_poly_modifier = None;
+                      m_type = TVoid; m_name = (Name "bark");
+                      m_params = (Params []) },
+                    (Body
+                       [(Expr
+                           (Method_invoke (
+                              (Access_By_Point ((Exp_Name (Name "Console")),
+                                 (Exp_Name (Name "WriteLine")))),
+                              (Args [(Exp_Const (VString "Bark Bark !!"))]))))
+                         ])
+                    ))
+                 ]
+               })
            ]) |}]
 ;;
 
@@ -295,7 +306,10 @@ let%expect_test _ =
     \ class Pig: Animal {\n\
     \    public string name = \"Undefined\";\n\
     \    public int age;\n\
-    \    public Pig(int name) : base(name, age){};\n\
+    \    public int Sum(int a) {\n\
+    \            animalSound(a, b);\n\
+    \    };\n\
+    \        public Pig(int name) : base(name, age){};\n\
     \        public void animalSound() {\n\
     \      Console.WriteLine(\"The pig says: wee wee\");\n\
     \    }\n\
@@ -312,86 +326,108 @@ let%expect_test _ =
   [%expect
     {|
     (Ast
-       [(Interface ((Some Public), (Name "Animal"), None,
-           [(IField
-               { f_modifier = None; f_type = (TVar TString);
-                 f_name = (Name "name") });
-             (IField
-                { f_modifier = None; f_type = (TVar TInt); f_name = (Name "age")
-                  });
-             (IMethod
-                { m_acc_modifier = None; m_poly_modifier = None; m_type = TVoid;
-                  m_name = (Name "animalSound"); m_params = (Params []) });
-             (IMethod
-                { m_acc_modifier = None; m_poly_modifier = None; m_type = TVoid;
-                  m_name = (Name "run"); m_params = (Params []) })
-             ]
-           ));
-         (Class (None, (Name "Pig"), (Some (Name "Animal")),
-            [(CField (
-                { f_modifier = (Some Public); f_type = (TVar TString);
-                  f_name = (Name "name") },
-                (Some (Exp_Const (VString "Undefined")))));
-              (CField (
-                 { f_modifier = (Some Public); f_type = (TVar TInt);
-                   f_name = (Name "age") },
-                 None));
-              (CConstructor (
-                 { c_modifier = (Some Public); c_name = (Name "Pig");
-                   c_params =
-                   (Params [(Var_Declaration ((TVar TInt), (Name "name")))]);
-                   c_base =
-                   (Some (Args
-                            [(Exp_Name (Name "name")); (Exp_Name (Name "age"))]))
-                   },
-                 (Body [])));
-              (CMethod (
-                 { m_acc_modifier = (Some Public); m_poly_modifier = None;
-                   m_type = TVoid; m_name = (Name "animalSound");
-                   m_params = (Params []) },
-                 (Body
-                    [(Expr
-                        (Method_invoke (
-                           (Access_By_Point ((Exp_Name (Name "Console")),
-                              (Exp_Name (Name "WriteLine")))),
-                           (Args [(Exp_Const (VString "The pig says: wee wee"))])
-                           )))
-                      ])
-                 ))
-              ]
-            ));
-         (Class (None, (Name "Dog"), None,
-            [(CField (
-                { f_modifier = (Some Public); f_type = (TVar TString);
-                  f_name = (Name "name") },
-                (Some (Exp_Const (VString "Undefined")))));
-              (CField (
-                 { f_modifier = (Some Public); f_type = (TVar TInt);
-                   f_name = (Name "age") },
-                 None));
-              (CField (
+       [(Interface
+           { i_modifier = (Some Public); i_name = (Name "Animal");
+             i_parent = None;
+             i_body =
+             [(IField
                  { f_modifier = None; f_type = (TVar TString);
-                   f_name = (Name "breed") },
-                 None));
-              (CMethod (
-                 { m_acc_modifier = (Some Public); m_poly_modifier = None;
-                   m_type = TVoid; m_name = (Name "bark"); m_params = (Params [])
-                   },
-                 (Body
-                    [(Expr
-                        (Method_invoke (
-                           (Access_By_Point ((Exp_Name (Name "Console")),
-                              (Exp_Name (Name "WriteLine")))),
-                           (Args [(Exp_Const (VString "Bark Bark !!"))]))))
-                      ])
-                 ))
-              ]
-            ))
+                   f_name = (Name "name") });
+               (IField
+                  { f_modifier = None; f_type = (TVar TInt);
+                    f_name = (Name "age") });
+               (IMethod
+                  { m_acc_modifier = None; m_poly_modifier = None;
+                    m_type = TVoid; m_name = (Name "animalSound");
+                    m_params = (Params []) });
+               (IMethod
+                  { m_acc_modifier = None; m_poly_modifier = None;
+                    m_type = TVoid; m_name = (Name "run"); m_params = (Params [])
+                    })
+               ]
+             });
+         (Class
+            { cl_modifier = None; cl_name = (Name "Pig");
+              cl_parent = (Some (Name "Animal"));
+              cl_body =
+              [(CField (
+                  { f_modifier = (Some Public); f_type = (TVar TString);
+                    f_name = (Name "name") },
+                  (Some (Exp_Const (VString "Undefined")))));
+                (CField (
+                   { f_modifier = (Some Public); f_type = (TVar TInt);
+                     f_name = (Name "age") },
+                   None));
+                (CMethod (
+                   { m_acc_modifier = (Some Public); m_poly_modifier = None;
+                     m_type = (TRetrun TInt); m_name = (Name "Sum");
+                     m_params =
+                     (Params [(Var_Declaration ((TVar TInt), (Name "a")))]) },
+                   (Body
+                      [(Expr
+                          (Method_invoke ((Exp_Name (Name "animalSound")),
+                             (Args [(Exp_Name (Name "a")); (Exp_Name (Name "b"))])
+                             )))
+                        ])
+                   ));
+                (CConstructor (
+                   { c_modifier = (Some Public); c_name = (Name "Pig");
+                     c_params =
+                     (Params [(Var_Declaration ((TVar TInt), (Name "name")))]);
+                     c_base =
+                     (Some (Args
+                              [(Exp_Name (Name "name")); (Exp_Name (Name "age"))]))
+                     },
+                   (Body [])));
+                (CMethod (
+                   { m_acc_modifier = (Some Public); m_poly_modifier = None;
+                     m_type = TVoid; m_name = (Name "animalSound");
+                     m_params = (Params []) },
+                   (Body
+                      [(Expr
+                          (Method_invoke (
+                             (Access_By_Point ((Exp_Name (Name "Console")),
+                                (Exp_Name (Name "WriteLine")))),
+                             (Args
+                                [(Exp_Const (VString "The pig says: wee wee"))])
+                             )))
+                        ])
+                   ))
+                ]
+              });
+         (Class
+            { cl_modifier = None; cl_name = (Name "Dog"); cl_parent = None;
+              cl_body =
+              [(CField (
+                  { f_modifier = (Some Public); f_type = (TVar TString);
+                    f_name = (Name "name") },
+                  (Some (Exp_Const (VString "Undefined")))));
+                (CField (
+                   { f_modifier = (Some Public); f_type = (TVar TInt);
+                     f_name = (Name "age") },
+                   None));
+                (CField (
+                   { f_modifier = None; f_type = (TVar TString);
+                     f_name = (Name "breed") },
+                   None));
+                (CMethod (
+                   { m_acc_modifier = (Some Public); m_poly_modifier = None;
+                     m_type = TVoid; m_name = (Name "bark");
+                     m_params = (Params []) },
+                   (Body
+                      [(Expr
+                          (Method_invoke (
+                             (Access_By_Point ((Exp_Name (Name "Console")),
+                                (Exp_Name (Name "WriteLine")))),
+                             (Args [(Exp_Const (VString "Bark Bark !!"))]))))
+                        ])
+                   ))
+                ]
+              })
          ]) |}]
 ;;
 
 let%expect_test _ =
-  test_ast
-  "";
-  [%expect
-    {| (Ast []) |}]
+  test_ast "";
+  [%expect {| (Ast []) |}]
+;;

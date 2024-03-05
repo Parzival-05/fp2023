@@ -106,7 +106,7 @@ let t_void =
 ;;
 
 let t_type = read_word >>= fun str -> type_converter str
-let t_val = choice [ (t_type >>| fun vt -> TVar vt) ;p_name >>| (fun n -> TVar (TObj n)) ]
+let t_val = choice [ (t_type >>| fun vt -> TVar vt); (p_name >>| fun n -> TVar (TObj n)) ]
 let t_method = choice [ t_void; (t_type >>| fun mt -> TRetrun mt) ]
 
 (* EXPR PARSE *)
@@ -151,7 +151,6 @@ let p_list e str =
 ;;
 
 let p_list1 e str = p_list e str <|> return []
-
 let e_name = p_name >>= fun n -> return (Exp_Name n)
 let p_dot = read_str "." *> return (fun name expr -> Access_By_Point (name, expr))
 let e_access_by_point = chainr1 e_name p_dot
@@ -259,6 +258,7 @@ let p_access_modifier = function
 ;;
 
 let p_poly_modifier = function
+  | "static" -> return Static
   | "override" -> return Override
   | "virtual" -> return Virtual
   | "new" -> return MNew
@@ -338,7 +338,8 @@ let class_members =
 
 let p_class =
   lift4
-    (fun m n p mem -> Class (m, n, p, mem))
+    (fun cl_modifier cl_name cl_parent cl_body ->
+      Class { cl_modifier; cl_name; cl_parent; cl_body })
     access_modifier_opt
     read_class_name
     parent
@@ -350,6 +351,14 @@ let read_interface_name =
   >>= function
   | "interface" -> p_name
   | _ -> fail "This is not a interface"
+;;
+
+let interface_modifier =
+  let p_public = function
+    | "public" -> return Public
+    | _ -> fail "Interface can only have public fields "
+  in
+  modifier_opt p_public
 ;;
 
 let intrface_members =
@@ -364,8 +373,9 @@ let intrface_members =
 
 let p_interface =
   lift4
-    (fun m n p mem -> Interface (m, n, p, mem))
-    access_modifier_opt
+    (fun i_modifier i_name i_parent i_body ->
+      Interface { i_modifier; i_name; i_parent; i_body })
+    interface_modifier
     read_interface_name
     parent
     intrface_members

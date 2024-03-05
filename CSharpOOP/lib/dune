@@ -1,7 +1,7 @@
 (library
  (name csharp_lib)
  (public_name CSharpOOP.Lib)
- (modules Ast Parser Type_checker Monad State_type)
+ (modules Ast Parser Type_checker Monad State_type Interpreter)
  (libraries base angstrom str)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq))
@@ -10,7 +10,7 @@
 
 (library
  (name tests)
- (modules tests)
+ (modules tests tc_tests)
  (libraries csharp_lib)
  (preprocess
   (pps ppx_expect ppx_inline_test ppx_deriving.show ppx_deriving.eq))
