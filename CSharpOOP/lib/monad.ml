@@ -210,14 +210,14 @@ module Monad_Interpreter = struct
 
   type ('a, 'r, 'e) result =
     | Signal of ('a, 'r) runtime_signal
-    | Error of 'e
+    | IError of 'e
 
   type st = State_type.St_Interpreter.st_interpreter
   type ('a, 'r) t = st -> st * ('a, 'r, error) result
 
   let pipe : 'a -> ('a, 'r) t = fun x st -> st, Signal (Pipe x)
   let return : 'r -> ('a, 'r) t = fun x st -> st, Signal (Return x)
-  let fail : 'e -> ('a, 'r) t = fun er st -> st, Error er
+  let fail : 'e -> ('a, 'r) t = fun er st -> st, IError er
 
   let ( >>= ) : ('a, 'r) t -> ('a -> ('b, 'r) t) -> ('b, 'r) t =
     fun x f st ->
@@ -225,14 +225,14 @@ module Monad_Interpreter = struct
     match x with
     | Signal (Pipe x) -> f x st
     | Signal (Return r) -> return r st
-    | Error er -> fail er st
+    | IError er -> fail er st
   ;;
 
   let ( |>>= ) x f st =
     let st, x = x st in
     match x with
     | Signal sign -> f sign st
-    | Error er -> fail er st
+    | IError er -> fail er st
   ;;
 
   let ( >>| ) : ('a, 'r) t -> ('a -> 'b) -> ('b, 'r) t =
@@ -241,7 +241,7 @@ module Monad_Interpreter = struct
     match x with
     | Signal (Pipe x) -> pipe (f x) st
     | Signal (Return r) -> return r st
-    | Error er -> fail er st
+    | IError er -> fail er st
   ;;
 
   let ( <|> ) : ('a, 'r) t -> ('a, 'r) t -> ('a, 'r) t =
@@ -249,7 +249,7 @@ module Monad_Interpreter = struct
     let st, x = x1 st in
     match x with
     | Signal (Pipe x) -> pipe x st
-    | Error _ -> x2 st
+    | IError _ -> x2 st
     | Signal (Return r) -> return r st
   ;;
 
@@ -486,8 +486,7 @@ module Monad_Interpreter = struct
     in
     let rec create_p_obj constr adr =
       read_global_el constr.c_name
-      >>= fun obj ->
-      match obj with
+      >>= function
       | Int_Interface _ -> pipe None
       | Int_Class cl ->
         (match cl.cl_parent with
@@ -530,8 +529,7 @@ module Monad_Interpreter = struct
       read_memory_obj adr
       >>= fun obj ->
       find_local_el obj.cl_name
-      >>= fun constr ->
-      match constr with
+      >>= function
       | Code (Constructor (c, b)) ->
         (match obj.p_adr with
          | Some p_adr ->

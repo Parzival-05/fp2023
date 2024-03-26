@@ -44,8 +44,7 @@ let eq_name_return_ctx n1 n2 m m_t =
   | false -> None
 ;;
 
-let is_public obj_name ctx modifier =
-  match modifier with
+let is_public obj_name ctx = function
   | Some Public -> return ctx
   | Some Protected -> fail Access_error
   | Some Private -> fail Access_error
@@ -98,8 +97,7 @@ let find_obj_mem_with_fail n_obj n_mem =
 ;;
 
 let tc_access_by_p e1 e2 =
-  let get_first_mem_class_name el =
-    match el with
+  let get_first_mem_class_name = function
     | VType (TVar (TObj n)) | Field { f_type = TVar (TObj n) } -> return n
     | _ -> fail (Other "Point access check error")
   in
@@ -110,8 +108,7 @@ let tc_access_by_p e1 e2 =
   let next_step mem_ctx expr f =
     get_next_mem_class_name mem_ctx >>= fun p_name -> f p_name expr
   in
-  let rec acc_by_p n_obj e =
-    match e with
+  let rec acc_by_p n_obj = function
     | Exp_Name n_mem -> find_obj_mem_with_fail n_obj n_mem
     | Access_By_Point (e1, e2) ->
       (match e1 with
@@ -145,8 +142,7 @@ let tc_access_by_p e1 e2 =
 let tc_method_args (Params params) args expr_tc =
   let params_to_list_of_type p =
     List.map
-      (fun x ->
-        match x with
+      (function
         | Var_Declaration (t, _) -> vart_to_type t)
       p
   in
@@ -548,6 +544,5 @@ let type_checker ast =
 ;;
 
 let type_checker_with_main ast =
-  match type_checker ast with
-  | (_, _, _, _, main), res -> main, res
+  type_checker ast |> fun ((_, _, _, _, main), res) -> main, res
 ;;

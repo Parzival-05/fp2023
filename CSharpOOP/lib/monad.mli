@@ -183,7 +183,7 @@ module Monad_Interpreter : sig
 
   type ('a, 'r, 'e) result =
     | Signal of ('a, 'r) runtime_signal
-    | Error of 'e
+    | IError of 'e
 
   type st = State_type.St_Interpreter.st_interpreter
   type ('a, 'r) t = st -> st * ('a, 'r, error) result

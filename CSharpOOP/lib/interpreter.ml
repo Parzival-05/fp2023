@@ -357,8 +357,7 @@ let run_interpreter cl_with_main g_env =
                   , Body [] )))
           <|> pipe ())
     in
-    let f obj =
-      match obj with
+    let f = function
       | Class cl -> save_constr cl
       | Interface _ -> pipe ()
     in
@@ -388,8 +387,8 @@ let interpreter str =
        run (run_interpreter cl_with_main ast)
        |> (function
         | _, Signal (Pipe x) -> Result.Ok x
-        | _, Error er -> Result.Error er
-        | _, _ -> Result.Error (Other ""))
+        | _, IError er -> Result.Error er
+        | _, _ -> Result.Error (Impossible_result "Run_method returns pipe or error"))
      | None, Result.Ok _ -> Result.Error (Other "Main method not found")
      | _, Result.Error er -> Result.Error (Type_check_error er))
   | Result.Error er -> Result.Error (Parser_error er)
