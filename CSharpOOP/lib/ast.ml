@@ -23,7 +23,7 @@ type var_type = TVar of typ [@@deriving show { with_path = false }, eq]
 
 type meth_type =
   | TVoid (** type [void] for methods *)
-  | TRetrun of typ
+  | TReturn of typ
 [@@deriving show { with_path = false }, eq]
 
 type access_modifier =

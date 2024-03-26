@@ -4,7 +4,6 @@
 
 open Ast
 open State_type
-open State_type.TypeCheck
 open Monad.Monad_TypeCheck
 
 let val_to_type = function
@@ -23,7 +22,7 @@ let vardec_to_type = function
 ;;
 
 let find_mem_type = function
-  | VType (TVar n) | Field { f_type = TVar n } | Method { m_type = TRetrun n } -> return n
+  | VType (TVar n) | Field { f_type = TVar n } | Method { m_type = TReturn n } -> return n
   | Constructor c -> return (TObj c.c_name)
   | _ -> fail Mismatch
 ;;
@@ -38,51 +37,23 @@ let eq e el1 el2 =
 
 let eq_type t1 t2 = eq equal_typ t1 t2
 let eq_name n1 n2 = eq equal_name n1 n2
-let get_cur_class_ctx = get_cur_class_name >>= read_global_el
-
-let get_parent =
-  get_cur_class_ctx
-  >>= function
-  | TC_Class { cl_parent = Some p } | TC_Interface ({ i_parent = Some p }, _) -> return p
-  | _ -> fail (Other "This class doesn't have a parent")
-;;
-
-let tc_access_modifier name ctx ~acc_modifier:m ~default:d =
-  match m with
-  | Some Public -> return ctx
-  (*TODO: кажется, это не работает. исправить!!!!*)
-  (* | Some Protected ->
-     get_parent
-     >>= fun name0 ->
-     (match equal_name name0 p_name with
-     | true -> return ctx
-     | false -> fail Mismatch) *)
-  | Some Private -> fail Mismatch
-  | None ->
-    (match d with
-     | false -> fail Mismatch
-     | true -> return ctx)
-  | _ -> return ctx
-;;
-
-let tc_class_modifier name = function
-  | CField (f, _) ->
-    tc_access_modifier name (Field f) ~acc_modifier:f.f_modifier ~default:false
-  | CMethod (m, _) ->
-    tc_access_modifier name (Method m) ~acc_modifier:m.m_acc_modifier ~default:false
-  | CConstructor (c, _) -> return (Constructor c)
-;;
-
-let tc_interface_modifier name = function
-  | IField f -> tc_access_modifier name (Field f) ~acc_modifier:f.f_modifier ~default:true
-  | IMethod m ->
-    tc_access_modifier name (Method m) ~acc_modifier:m.m_acc_modifier ~default:true
-;;
 
 let eq_name_return_ctx n1 n2 m m_t =
   match equal_name n1 n2 with
   | true -> Some (m_t m)
   | false -> None
+;;
+
+let is_public obj_name ctx modifier =
+  match modifier with
+  | Some Public -> return ctx
+  | Some Protected -> fail Access_error
+  | Some Private -> fail Access_error
+  | None ->
+    read_global_el obj_name
+    >>= (function
+     | TC_Class _ -> fail Access_error
+     | TC_Interface _ -> return ctx)
 ;;
 
 let get_class_mem name = function
@@ -96,7 +67,6 @@ let get_interface_mem name = function
   | IMethod m -> eq_name_return_ctx m.m_name name m (fun m -> Method m)
 ;;
 
-(*TODO: добавить провверку модифаеров*)
 let find_member_from_obj obj_name name =
   let find_mem b name foo =
     let f n acc m =
@@ -117,12 +87,19 @@ let find_member_from_obj obj_name name =
 let find_obj_mem_with_fail n_obj n_mem =
   find_member_from_obj n_obj n_mem
   >>= function
-  | Some m -> return m
+  | Some mem ->
+    (match mem with
+     | Field f -> is_public n_obj (Field f) f.f_modifier
+     | Method m -> is_public n_obj (Method m) m.m_acc_modifier
+     | Constructor c -> is_public n_obj (Constructor c) c.c_modifier
+     | _ ->
+       fail (Impossible_result "Object can only have fields, constructors and methods"))
   | None -> fail (Other "Member not found")
 ;;
 
 let tc_access_by_p e1 e2 =
-  let get_first_mem_class_name = function
+  let get_first_mem_class_name el =
+    match el with
     | VType (TVar (TObj n)) | Field { f_type = TVar (TObj n) } -> return n
     | _ -> fail (Other "Point access check error")
   in
@@ -151,18 +128,17 @@ let tc_access_by_p e1 e2 =
        | _ -> fail (Other "Point access check error"))
     | _ -> fail (Other "Point access check error")
   in
-  (*TODO: добавить проверку модифаеров*)
   match e1 with
   | Exp_Name n_mem ->
     let get_el = read_local_el n_mem in
     let get_inst_tp = get_el >>= get_first_mem_class_name in
-    let eq_name cl_n cur_cl_n =
+    let eq_name_ cl_n cur_cl_n =
       equal_name cl_n cur_cl_n
       |> function
       | true -> acc_by_p_ e2
       | false -> acc_by_p cl_n e2
     in
-    get_inst_tp >>= fun cl_name -> get_cur_class_name >>= eq_name cl_name
+    get_inst_tp >>= fun cl_name -> get_cur_class_name >>= eq_name_ cl_name
   | _ -> fail (Other "Point access check error")
 ;;
 
@@ -194,7 +170,7 @@ let tc_method_invoke e args expr_tc =
     tc_method_args m.m_params args expr_tc
     *>
       (match m.m_type with
-      | TRetrun t -> return (VType (TVar t))
+      | TReturn t -> return (VType (TVar t))
       | TVoid -> fail (Other "Method invocation check error"))
   | Constructor c ->
     tc_method_args c.c_params args expr_tc *> return (VType (TVar (TObj c.c_name)))
@@ -209,19 +185,18 @@ let tc_bin_op b e1 e2 expr_tc =
     >>= fun e1 -> find_expr_typ e2 expr_tc >>= fun e2 -> eq_type e1 e2
   in
   let compare_three_expr_typ e1 e2 t =
-    compare_two_expr_typ e1 e2 *> find_expr_typ e1 expr_tc >>= fun e -> eq_type e t
+    compare_two_expr_typ e1 e2 >>= fun e -> eq_type e t
   in
-  let return_rez _ rez = return (VType (TVar rez)) in
+  let return_rez rez = return (VType (TVar rez)) in
   match b with
   | Plus | Asterisk | Dash | Slash | Mod ->
-    return_rez (compare_three_expr_typ e1 e2 TInt) TInt
+    compare_three_expr_typ e1 e2 TInt *> return_rez TInt
   | Less | LessOrEqual | More | MoreOrEqual ->
-    return_rez (compare_three_expr_typ e1 e2 TInt) TBool
-  | Equal | NotEqual -> return_rez (compare_two_expr_typ e1 e2) TBool
-  | And | Or -> return_rez (compare_three_expr_typ e1 e2 TBool) TBool
-  (*TODO: преобразование типов?*)
+    compare_three_expr_typ e1 e2 TInt *> return_rez TBool
+  | Equal | NotEqual -> compare_two_expr_typ e1 e2 *> return_rez TBool
+  | And | Or -> compare_three_expr_typ e1 e2 TBool *> return_rez TBool
   | Assign ->
-    find_expr_typ e1 expr_tc >>= fun e -> return_rez (compare_two_expr_typ e1 e2) e
+    find_expr_typ e1 expr_tc >>= fun e -> compare_two_expr_typ e1 e2 *> return_rez e
 ;;
 
 let tc_un_op u e expr_tc =
@@ -239,16 +214,19 @@ let tc_un_op u e expr_tc =
   un_op u e >>= fun t -> return (VType (TVar t))
 ;;
 
-let rec tc_expr = function
-  | Exp_Const t -> return (VType (TVar (val_to_type t)))
-  | Exp_Name n -> name_to_obj_ctx n
-  | Method_invoke (e, Args args) -> tc_method_invoke e args tc_expr
-  | Access_By_Point (e1, e2) -> tc_access_by_p e1 e2
-  | Bin_op (b, e1, e2) -> tc_bin_op b e1 e2 tc_expr
-  | Un_op (u, e) -> tc_un_op u e tc_expr
+let tc_expr =
+  let rec tc_expr_ = function
+    | Exp_Const t -> return (VType (TVar (val_to_type t)))
+    | Exp_Name n -> name_to_obj_ctx n
+    | Method_invoke (e, Args args) -> tc_method_invoke e args tc_expr_
+    | Access_By_Point (e1, e2) -> tc_access_by_p e1 e2
+    | Bin_op (b, e1, e2) -> tc_bin_op b e1 e2 tc_expr_
+    | Un_op (u, e) -> tc_un_op u e tc_expr_
+  in
+  tc_expr_
 ;;
 
-let tc_expr_with_typ e = tc_expr e >>= find_mem_type
+let tc_expr_with_typ e = tc_expr e >>= fun x -> find_mem_type x
 
 (* STATEMENTS TYPECHECK*)
 
@@ -285,7 +263,7 @@ let rec tc_statement =
     >>= fun m_t ->
     match m_t, e_opt with
     | Some TVoid, None -> return ()
-    | Some (TRetrun t), Some e ->
+    | Some (TReturn t), Some e ->
       (eq_type_with_expr t e
        <|> fail (Other "Returned type does not match the function type"))
       *> return ()
@@ -336,7 +314,33 @@ let tc_member =
     in
     iter f params
   in
-  let tc_meth_constr typ params body =
+  let tc_base name base =
+    read_global_el name
+    >>= function
+    | TC_Class cl ->
+      (match cl.cl_parent with
+       | Some n ->
+         (match base with
+          | Some (Args args) ->
+            read_local_el n
+            >>= (function
+             | Constructor c -> tc_method_args c.c_params args tc_expr *> return ()
+             | _ -> fail Mismatch)
+          | _ -> fail (Other "Class with a parent must have the base parameter"))
+       | None ->
+         (match base with
+          | None -> return ()
+          | _ -> fail (Other "Class without a parent should not have a base parameter")))
+    | TC_Interface _ -> return ()
+  in
+  let tc_constr typ params body base name =
+    local
+      (write_meth_type typ
+       *> save_params_to_l params
+       *> tc_base name base
+       *> tc_statement body)
+  in
+  let tc_meth typ params body =
     local (write_meth_type typ *> save_params_to_l params *> tc_statement body)
   in
   let tc_class_method b = function
@@ -344,8 +348,8 @@ let tc_member =
       (match equal_name m_name (Name "Main") with
        | true ->
          (match m_poly_modifier, m_params, m_type with
-          | Some Static, Params [], TRetrun TInt | Some Static, Params [], TVoid ->
-            tc_meth_constr m_type (Params []) b *> read_main_class
+          | Some Static, Params [], TReturn TInt | Some Static, Params [], TVoid ->
+            tc_meth m_type (Params []) b *> read_main_class
             >>= (function
              | None -> get_cur_class_name >>= fun n -> write_main_class (Some n)
              | Some _ -> fail (Other "Main method already exists"))
@@ -354,12 +358,13 @@ let tc_member =
               (Other
                  "Main must be a static method, have no params and return only int and \
                   void"))
-       | false -> tc_meth_constr m_type m_params b)
+       | false -> tc_meth m_type m_params b)
   in
   function
   | CField ({ f_type }, e_opt) -> tc_class_field f_type e_opt
   | CMethod (m, b) -> tc_class_method b m
-  | CConstructor ({ c_params }, b) -> tc_meth_constr TVoid c_params b
+  | CConstructor ({ c_params; c_base; c_name }, b) ->
+    tc_constr TVoid c_params b c_base c_name
 ;;
 
 (* OBJECTS TYPECHECK *)
@@ -372,7 +377,86 @@ let save_global n ctx =
 ;;
 
 let tc_obj =
-  let foo body _ = function
+  let write_mems b =
+    let foo = function
+      | CField (f, _) -> save_decl f.f_name (Field f)
+      | CMethod (m, _) -> save_decl m.m_name (Method m)
+      | CConstructor _ -> return ()
+    in
+    iter foo b
+  in
+  let tc_mems b = iter tc_member b in
+  let tc_and_write_i_mems b =
+    let foo = function
+      | IField f -> save_decl f.f_name (Field f)
+      | IMethod m -> save_decl m.m_name (Method m)
+    in
+    iter foo b
+  in
+  let cl_inher_from_cl body p_body =
+    let acc_mod = function
+      | Some Public -> true
+      | Some Protected -> true
+      | Some Private -> false
+      | None -> false
+    in
+    let tc_poly_mod p_m body =
+      List.exists
+        (function
+          | CMethod (cl_m, _) ->
+            p_m.m_poly_modifier != None
+            && (cl_m = { p_m with m_poly_modifier = Some Override }
+                || cl_m
+                   = { p_m with
+                       m_poly_modifier = Some MNew
+                     ; m_acc_modifier = Some Public
+                     }
+                || cl_m
+                   = { p_m with
+                       m_poly_modifier = Some MNew
+                     ; m_acc_modifier = Some Protected
+                     })
+          | _ -> true)
+        body
+    in
+    let tc_cl_method_inher p_m p_b body acc =
+      acc_mod p_m.m_acc_modifier
+      |> function
+      | true ->
+        List.for_all
+          (function
+            | CMethod (cl_m, _) -> not (equal_name cl_m.m_name p_m.m_name)
+            | _ -> true)
+          body
+        |> (function
+         | false ->
+           tc_poly_mod p_m body
+           |> (function
+            | true -> return acc
+            | false -> fail (Other "Problem with method modifiers"))
+         | true ->
+           write_local_el p_m.m_name (Method p_m) *> return (CMethod (p_m, p_b) :: acc))
+      | false -> return acc
+    in
+    let foo body acc = function
+      | CField (f, f_b) ->
+        (match acc_mod f.f_modifier with
+         | true ->
+           List.exists
+             (function
+               | CField (cl_f, _) -> cl_f.f_name = f.f_name
+               | _ -> false)
+             body
+           |> (function
+            | true -> return acc
+            | false -> write_local_el f.f_name (Field f) *> return (CField (f, f_b) :: acc))
+         | false -> return acc)
+      | CMethod (m, m_b) -> tc_cl_method_inher m m_b body acc
+      | CConstructor _ -> return acc
+    in
+    fold_left (foo body) body p_body
+  in
+  let cl_inher_from_intrfc body _ = function
     | Field f ->
       List.exists
         (function
@@ -391,12 +475,12 @@ let tc_obj =
     | Some parent ->
       read_global_el parent
       >>= (function
-       | TC_Class _ -> return ()
+       | TC_Class p_cl -> cl_inher_from_cl body p_cl.cl_body
        | TC_Interface (_, p_map) ->
-         (match MapName.for_all (foo body) p_map with
-          | true -> return ()
+         (match MapName.for_all (cl_inher_from_intrfc body) p_map with
+          | true -> return body
           | false -> fail (Other "Class incorrectly inherited from an interface")))
-    | None -> return ()
+    | None -> return body
   in
   let tc_interface_inheritance = function
     | Some parent ->
@@ -407,28 +491,21 @@ let tc_obj =
     | None -> return MapName.empty
   in
   let save_class cl =
-    tc_inheritance cl.cl_body cl.cl_parent *> save_global cl.cl_name (TC_Class cl)
+    tc_inheritance cl.cl_body cl.cl_parent
+    >>= fun body -> save_global cl.cl_name (TC_Class { cl with cl_body = body })
   in
   let save_i_body_to_map m i =
     let foo map = function
       | IField f ->
         (match MapName.find_opt f.f_name map with
-         | Some _ -> None
-         | None -> Some (MapName.add f.f_name (Field f) map))
+         | Some _ -> fail (Other "Inheritance error ")
+         | None -> return (MapName.add f.f_name (Field f) map))
       | IMethod m ->
         (match MapName.find_opt m.m_name map with
-         | Some _ -> None
-         | None -> Some (MapName.add m.m_name (Method m) map))
+         | Some _ -> fail (Other "Inheritance error ")
+         | None -> return (MapName.add m.m_name (Method m) map))
     in
-    let foo m el =
-      match m with
-      | None -> None
-      | Some m -> foo m el
-    in
-    List.fold_left foo (Some m) i
-    |> function
-    | Some map -> return map
-    | None -> fail (Other "")
+    fold_left foo m i
   in
   let save_interface i =
     tc_interface_inheritance i.i_parent
@@ -436,25 +513,7 @@ let tc_obj =
     save_i_body_to_map p_map i.i_body
     >>= fun m -> save_global i.i_name (TC_Interface (i, m))
   in
-  let tc_and_write_mems b =
-    let foo el =
-      tc_member el
-      *>
-      match el with
-      | CField (f, _) -> save_decl f.f_name (Field f)
-      | CMethod (m, _) -> save_decl m.m_name (Method m)
-      | CConstructor _ -> return ()
-    in
-    iter foo b
-  in
-  let tc_and_write_i_mems b =
-    let foo = function
-      | IField f -> save_decl f.f_name (Field f)
-      | IMethod m -> save_decl m.m_name (Method m)
-    in
-    iter foo b
-  in
-  let tc_constructor cl =
+  let save_constructor cl =
     let foo n = function
       | CConstructor (c, _) -> eq_name c.c_name n *> save_decl c.c_name (Constructor c)
       | _ -> return ()
@@ -474,8 +533,8 @@ let tc_obj =
   | Class cl ->
     let { cl_name; cl_body } = cl in
     write_cur_class_name cl_name
-    *> local (tc_and_write_mems cl_body *> save_class cl)
-    *> tc_constructor cl
+    *> local (write_mems cl_body *> save_class cl *> tc_mems cl_body)
+    *> save_constructor cl
     *> return ()
   | Interface i ->
     let { i_name; i_body } = i in
@@ -484,30 +543,11 @@ let tc_obj =
     *> return ()
 ;;
 
-let type_checker = function
-  | Ast ast -> run (iter tc_obj ast) (MapName.empty, MapName.empty, None, None, None)
+let type_checker ast =
+  run (iter tc_obj ast) (MapName.empty, MapName.empty, None, None, None)
 ;;
 
 let type_checker_with_main ast =
   match type_checker ast with
-  | (_, _, _, _, main), _ ->
-    (match main with
-     | None -> fail (Other "Main method not found")
-     | _ -> return ())
+  | (_, _, _, _, main), res -> main, res
 ;;
-
-(*
-   A1 -> 1
-  A2 -> 2
-
-local_ctx_st = (_, adr, memory, _)
-
-memory = {
-   adr : MapState := { fild_name : (value); ... } ;
-   ...
-}
-
-A1.meth(){         # (_, 1, memory, _)
-  A2.meth2();      # (_, 2, memory, _)
-}
-*)

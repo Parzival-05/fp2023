@@ -10,7 +10,7 @@
 
 (library
  (name tests)
- (modules tests tc_tests)
+ (modules p_tests tc_tests i_tests)
  (libraries csharp_lib)
  (preprocess
   (pps ppx_expect ppx_inline_test ppx_deriving.show ppx_deriving.eq))

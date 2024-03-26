@@ -4,8 +4,6 @@
 
 val method_invoke : Ast.expr Angstrom.t -> Ast.expr Angstrom.t
 val s_declaration : Ast.statement Angstrom.t
-val expression : Ast.expr Angstrom.t
-val s_if_else : Ast.statement Angstrom.t -> Ast.statement Angstrom.t
 val p_body : Ast.statement Angstrom.t
 val p_method : Ast.methods Angstrom.t
 val c_method : Ast.member Angstrom.t

@@ -107,7 +107,7 @@ let t_void =
 
 let t_type = read_word >>= fun str -> type_converter str
 let t_val = choice [ (t_type >>| fun vt -> TVar vt); (p_name >>| fun n -> TVar (TObj n)) ]
-let t_method = choice [ t_void; (t_type >>| fun mt -> TRetrun mt) ]
+let t_method = choice [ t_void; (t_type >>| fun mt -> TReturn mt) ]
 
 (* EXPR PARSE *)
 let return_bin_op str binop =
@@ -162,7 +162,9 @@ let method_invoke e = lift2 (fun n a -> Method_invoke (n, a)) e_access_by_point 
 (* мб as *)
 let e_op =
   fix (fun expr ->
-    let expr = parens expr <|> p_val <|> method_invoke expr <|> e_name in
+    let expr =
+      parens expr <|> p_val <|> method_invoke expr <|> e_access_by_point <|> e_name
+    in
     let expr = chainl0 expr (minus <|> u_not <|> u_new) in
     let expr = chainl1 expr (mul <|> div <|> bmod) in
     let expr = chainl1 expr (add <|> sub) in
@@ -173,8 +175,7 @@ let e_op =
     chainr1 expr assign)
 ;;
 
-let expression = choice [ method_invoke e_op; e_op ]
-let e_op_assign = lift3 (fun f a x -> a f x) e_name assign expression
+let e_op_assign = lift3 (fun f a x -> a f x) (e_access_by_point <|> e_name) assign e_op
 let method_expr = choice [ e_op_assign; method_invoke e_op ] >>| fun i -> Expr i
 
 (* STATEMENTS PARSE*)
@@ -291,7 +292,7 @@ let p_method =
 let c_method = lift2 (fun m b -> CMethod (m, b)) p_method p_body
 
 let assign_option =
-  p_space @@ (read_str "=" *> expression) >>= (fun x -> return (Some x)) <|> return None
+  p_space @@ (read_str "=" *> e_op) >>= (fun x -> return (Some x)) <|> return None
 ;;
 
 let p_field =
