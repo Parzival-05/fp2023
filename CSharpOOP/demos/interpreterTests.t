@@ -59,19 +59,24 @@
 
   $ echo "Interface inheritance"; ./demoInterpreter.exe <<-EOF
   > interface I1 {
-  >    int a;
+  >    int a();
   > }
   > interface I2 : I1 {
-  >   int b;
+  >   int b();
   > }
   > class C : I2 {
-  >   public int a = 5;
-  >   public int b = 3+2;
+  >   public int a() {
+  >     return 5;
+  >   }
+  >   public int b() {
+  >     return 2+3;
+  >   }
   >   static int Main(){
-  >     for (int i = 0; i < b; i = i+1) {
-  >       a = a+i;
+  >     int n = b();
+  >     for (int i = 0; i < 5; i = i+1) {
+  >       n = n+i;
   >     }
-  >     return a;
+  >     return n;
   >   }
   > }
   > EOF

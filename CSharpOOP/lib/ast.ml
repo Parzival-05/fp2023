@@ -120,10 +120,7 @@ type member =
   | CConstructor of constructor * statement
 [@@deriving show { with_path = false }, eq]
 
-type i_member =
-  | IField of field
-  | IMethod of methods
-[@@deriving show { with_path = false }, eq]
+type i_member = IMethod of methods [@@deriving show { with_path = false }, eq]
 
 type obj_class =
   { cl_modifier : access_modifier option

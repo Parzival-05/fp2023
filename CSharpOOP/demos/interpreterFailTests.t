@@ -15,7 +15,7 @@
   > }
   > EOF
   Function type
-  Typecheck error: '(Other "Returned type does not match the function type")' 
+  (Typecheck_error (Other "Returned type does not match the function type"))
 
   $ echo "Double declare one variable"; ./demoInterpreter.exe <<-EOF
   >  class Test {
@@ -25,7 +25,7 @@
   > } 
   > EOF
   Double declare one variable
-  Typecheck error: '(Other "This variable is already declared")' 
+  (Typecheck_error (Other "This variable is already declared"))
 
   $ echo "Main method"; ./demoInterpreter.exe <<-EOF
   > class A {
@@ -36,7 +36,7 @@
   > }
   > EOF
   Main method
-  Typecheck error: '(Other "Main method already exists")' 
+  (Typecheck_error (Other "Main method already exists"))
 
   $ echo "Access by point"; ./demoInterpreter.exe <<-EOF
   > class A {
@@ -48,7 +48,7 @@
   > }
   > EOF
   Access by point
-  Typecheck error: 'Access_error' 
+  (Typecheck_error Access_error)
 
   $ echo "Interface inheritance"; ./demoInterpreter.exe <<-EOF
   > interface I {
@@ -61,7 +61,7 @@
   > } 
   > EOF
   Interface inheritance
-  Typecheck error: '(Other "Class incorrectly inherited from an interface")' 
+  (Typecheck_error (Other "Class incorrectly inherited from an interface"))
 
   $ echo "Uninitialized value"; ./demoInterpreter.exe <<-EOF
   > class Test {
@@ -72,7 +72,7 @@
   > }
   > EOF
   Uninitialized value
-  Value is not initialized
+  (Interpret_error (Other "Value is not initialized"))
 
   $ echo "No main method"; ./demoInterpreter.exe <<-EOF
   > class Test {
@@ -82,7 +82,7 @@
   > }
   > EOF
   No main method
-  Main method not found
+  (Interpret_error (Other "Main method not found"))
 
   $ echo "Constructor typecheck"; ./demoInterpreter.exe <<-EOF
   > class Test {
@@ -91,4 +91,4 @@
   > }
   > EOF
   Constructor typecheck
-  Typecheck error: '(Other "Method invocation check error")' 
+  (Typecheck_error (Other "Method invocation check error"))

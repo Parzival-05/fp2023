@@ -2,31 +2,27 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-type error =
+type typecheck_error =
   | Occurs_check
-  | No_variable of string
-  | Address_not_found of int
-  | Var_declared of string
   | Mismatch
   | Access_error
   | Impossible_result of string
   | Other of string
-  | Type_check_error of error
-  | Parser_error of string
 [@@deriving show { with_path = false }]
 
-let pp_error ppf : error -> _ = function
-  | Occurs_check -> Format.fprintf ppf "Occurs check failed"
-  | No_variable x -> Format.fprintf ppf "Undefined variable '%s'" x
-  | Address_not_found x -> Format.fprintf ppf "Address '%i' not found " x
-  | Var_declared x -> Format.fprintf ppf "Variable '%s' is already declared" x
-  | Mismatch -> Format.fprintf ppf "Mismatch"
-  | Access_error -> Format.fprintf ppf "Access error"
-  | Impossible_result s -> Format.fprintf ppf "Impossible result: '%s'" s
-  | Other x -> Format.fprintf ppf "%s" x
-  | Type_check_error er -> Format.printf "Typecheck error: '%a' " pp_error er
-  | Parser_error s -> Format.fprintf ppf "Parser error: '%s'" s
-;;
+type interpreter_error =
+  | No_variable of string
+  | Address_not_found of int
+  | Var_declared of string
+  | Mismatch
+  | Impossible_result of string
+  | Other of string
+[@@deriving show { with_path = false }]
+
+type error =
+  | Typecheck_error of typecheck_error
+  | Interpret_error of interpreter_error
+[@@deriving show { with_path = false }]
 
 module Monad_SE = struct
   type ('st, 'a) t = 'st -> 'st * ('a, error) Result.t
@@ -114,7 +110,7 @@ module Monad_TypeCheck = struct
 
   let return_with_fail = function
     | Some x -> return x
-    | None -> fail Occurs_check
+    | None -> fail (Typecheck_error Occurs_check)
   ;;
 
   let read_local : 'a MapName.t t =
@@ -141,7 +137,10 @@ module Monad_TypeCheck = struct
     read
     >>= function
     | _, _, Some n, _, _ -> return n
-    | _ -> fail (Impossible_result "Current class can be 'none' only before running")
+    | _ ->
+      fail
+        (Typecheck_error
+           (Impossible_result "Current class can be 'none' only before running"))
   ;;
 
   let read_meth_type : meth_type option t =
@@ -155,8 +154,6 @@ module Monad_TypeCheck = struct
     >>= function
     | _, _, _, _, main -> return main
   ;;
-
-  Occurs_check
 
   let write_local n_l =
     read
@@ -293,12 +290,12 @@ module Monad_Interpreter = struct
   (* State read/write operations *)
   let pipe_name_with_fail (Name n) = function
     | Some x -> pipe x
-    | None -> fail (No_variable n)
+    | None -> fail (Interpret_error (No_variable n))
   ;;
 
   let pipe_adr_with_fail (Adr a) = function
     | Some x -> pipe x
-    | None -> fail (Address_not_found a)
+    | None -> fail (Interpret_error (Address_not_found a))
   ;;
 
   let read_local =
@@ -357,7 +354,7 @@ module Monad_Interpreter = struct
   let write_new_local_el (Name el_name) el_ctx =
     read_local_el_opt (Name el_name)
     >>= function
-    | Some _ -> fail (Var_declared el_name)
+    | Some _ -> fail (Interpret_error (Var_declared el_name))
     | None -> write_local_el (Name el_name) el_ctx
   ;;
 
@@ -401,7 +398,7 @@ module Monad_Interpreter = struct
       | None ->
         (match obj.p_adr with
          | Some p_adr -> find_memory_obj p_adr
-         | None -> fail Mismatch)
+         | None -> fail (Interpret_error Mismatch))
     in
     let find_global_el adr =
       let f acc = function
@@ -419,10 +416,10 @@ module Monad_Interpreter = struct
          | Some vl -> pipe vl
          | None ->
            (match name with
-            | Name n -> fail (No_variable n)))
+            | Name n -> fail (Interpret_error (No_variable n))))
       | Int_Interface _ ->
         (match name with
-         | Name n -> fail (No_variable n))
+         | Name n -> fail (Interpret_error (No_variable n)))
     in
     read_local_el name
     <|> (read_local_adr >>= fun adr -> find_memory_obj adr <|> find_global_el adr)
@@ -462,14 +459,14 @@ module Monad_Interpreter = struct
              >>= (function
               | Value (vl, _) ->
                 reset old_adr idx old_l *> pipe (MapName.add f.f_name (f, vl) acc)
-              | _ -> reset old_adr idx old_l *> fail Mismatch)
+              | _ -> reset old_adr idx old_l *> fail (Interpret_error Mismatch))
            | None -> pipe (MapName.add f.f_name (f, Not_init) acc))
         | _ -> pipe acc
       in
       read_global_el n
       >>= function
       | Int_Class cl -> fold_left foo MapName.empty cl.cl_body
-      | _ -> fail (Impossible_result "Check during typecheck")
+      | _ -> fail (Interpret_error (Impossible_result "Check during typecheck"))
     in
     let create_obj_ constr inh_adr =
       get_new_adr
@@ -498,7 +495,7 @@ module Monad_Interpreter = struct
               >>= fun my_adr ->
               create_p_obj sign adr
               >>= fun p_adr -> update_p_adr my_adr p_adr *> pipe (Some my_adr)
-            | _ -> fail (Other "Can't find constructor"))
+            | _ -> fail (Interpret_error (Other "Can't find constructor")))
          | None -> pipe None)
     in
     create_obj_ constr None
@@ -520,7 +517,9 @@ module Monad_Interpreter = struct
     match sign, ret_tp with
     | Pipe _, TVoid -> reset old_adr idx old_l *> pipe None
     | Return x, TReturn _ -> reset old_adr idx old_l *> pipe x
-    | _ -> reset old_adr idx old_l *> fail (Other "Error in the function return value")
+    | _ ->
+      reset old_adr idx old_l
+      *> fail (Interpret_error (Other "Error in the function return value"))
   ;;
 
   let run_constructor args i_expr i_statement adr =
@@ -539,10 +538,10 @@ module Monad_Interpreter = struct
               >>= fun (idx, old_l, old_adr) ->
               write_args_to_local args c.c_params *> get_args p_args
               >>= fun p_args -> reset old_adr idx old_l *> eval p_args p_adr *> pipe ()
-            | None -> fail (Impossible_result "Check during typecheck"))
+            | None -> fail (Interpret_error (Impossible_result "Check during typecheck")))
          | None -> pipe ())
         *> run_method args c.c_params adr TVoid (i_statement b)
-      | _ -> fail (Impossible_result "EEECheck during typecheck")
+      | _ -> fail (Interpret_error (Impossible_result "EEECheck during typecheck"))
     in
     eval args adr *> pipe adr
   ;;

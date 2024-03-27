@@ -363,12 +363,7 @@ let interface_modifier =
 ;;
 
 let intrface_members =
-  let member =
-    choice
-      [ p_field >>| (fun f -> IField f) <* semicolon1
-      ; p_method >>| (fun m -> IMethod m) <* semicolon
-      ]
-  in
+  let member = p_method >>| (fun m -> IMethod m) <* semicolon in
   parens2 @@ (many member <|> return []) <* space
 ;;
 

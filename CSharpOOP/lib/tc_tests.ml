@@ -49,8 +49,9 @@ let%expect_test _ =
         }
       }
     } |};
-  [%expect {|
-    Returned type does not match the function type |}]
+  [%expect
+    {|
+    (Typecheck_error (Other "Returned type does not match the function type")) |}]
 ;;
 
 let%expect_test _ =
@@ -61,7 +62,7 @@ let%expect_test _ =
     int a = 9;
   } |};
   [%expect {|
-    This variable is already declared |}]
+    (Typecheck_error (Other "This variable is already declared")) |}]
 ;;
 
 let%expect_test _ =
@@ -91,7 +92,7 @@ let%expect_test _ =
     int c = 9 + a;
   } |};
   [%expect {|
-    Mismatch |}]
+    (Typecheck_error Mismatch) |}]
 ;;
 
 let%expect_test _ =
@@ -152,7 +153,7 @@ let%expect_test _ =
     static void Main() {}
   } |};
   [%expect {|
-    Main method already exists |}]
+    (Typecheck_error (Other "Main method already exists")) |}]
 ;;
 
 let%expect_test _ =
@@ -163,7 +164,9 @@ let%expect_test _ =
   |};
   [%expect
     {|
-    Main must be a static method, have no params and return only int and void |}]
+    (Typecheck_error
+       (Other
+          "Main must be a static method, have no params and return only int and void")) |}]
 ;;
 
 let%expect_test _ =
@@ -174,7 +177,7 @@ let%expect_test _ =
     void Test() {}
   } |};
   [%expect {|
-    This variable is already declared |}]
+    (Typecheck_error (Other "This variable is already declared")) |}]
 ;;
 
 let%expect_test _ =
@@ -221,7 +224,7 @@ let%expect_test _ =
     public int b = ab.a;
   }|};
   [%expect {|
-    Access error |}]
+    (Typecheck_error Access_error) |}]
 ;;
 
 let%expect_test _ =
@@ -235,7 +238,7 @@ let%expect_test _ =
     public int b = ab.a;
   }|};
   [%expect {|
-    Member not found |}]
+    (Typecheck_error (Other "Member not found")) |}]
 ;;
 
 let%expect_test _ =
@@ -289,8 +292,9 @@ let%expect_test _ =
       b = m;
     }
   }|};
-  [%expect {|
-    Class with a parent must have the base parameter |}]
+  [%expect
+    {|
+    (Typecheck_error (Other "Class with a parent must have the base parameter")) |}]
 ;;
 
 let%expect_test _ =
@@ -309,7 +313,7 @@ let%expect_test _ =
     }
   }|};
   [%expect {|
-    Method invocation check error |}]
+    (Typecheck_error (Other "Method invocation check error")) |}]
 ;;
 
 let%expect_test _ =
@@ -323,8 +327,10 @@ let%expect_test _ =
       b = m;
     }
   }|};
-  [%expect {|
-    Class without a parent should not have a base parameter |}]
+  [%expect
+    {|
+    (Typecheck_error
+       (Other "Class without a parent should not have a base parameter")) |}]
 ;;
 
 let%expect_test _ =
@@ -340,7 +346,7 @@ let%expect_test _ =
     public int b = ab.a("5", 9*3);
   }|};
   [%expect {|
-    Method invocation check error |}]
+    (Typecheck_error (Other "Method invocation check error")) |}]
 ;;
 
 let%expect_test _ =
@@ -351,7 +357,7 @@ let%expect_test _ =
     };
   }|};
   [%expect {|
-    Mismatch |}]
+    (Typecheck_error Mismatch) |}]
 ;;
 
 let%expect_test _ =
@@ -362,7 +368,7 @@ let%expect_test _ =
     };
   }|};
   [%expect {|
-    Occurs check failed |}]
+    (Typecheck_error Occurs_check) |}]
 ;;
 
 let%expect_test _ =
@@ -376,7 +382,7 @@ let%expect_test _ =
     public int b = ab.a1.b;
   }|};
   [%expect {|
-    Point access check error |}]
+    (Typecheck_error (Other "Point access check error")) |}]
 ;;
 
 let%expect_test _ =
@@ -403,7 +409,7 @@ let%expect_test _ =
   }
  |};
   [%expect {|
-    Occurs check failed |}]
+    (Typecheck_error Occurs_check) |}]
 ;;
 
 let%expect_test _ =
@@ -417,7 +423,7 @@ let%expect_test _ =
   }
  |};
   [%expect {|
-    Occurs check failed |}]
+    (Typecheck_error Occurs_check) |}]
 ;;
 
 let%expect_test _ =
@@ -429,7 +435,7 @@ let%expect_test _ =
     int b = a;
   } |};
   [%expect {|
-    Occurs check failed |}]
+    (Typecheck_error Occurs_check) |}]
 ;;
 
 let%expect_test _ =
@@ -474,7 +480,7 @@ let%expect_test _ =
     }
   } |};
   [%expect {|
-    Problem with method modifiers |}]
+    (Typecheck_error (Other "Problem with method modifiers")) |}]
 ;;
 
 let%expect_test _ =
@@ -514,8 +520,9 @@ let%expect_test _ =
         private void c(){
         }
      } |};
-  [%expect {|
-    Class incorrectly inherited from an interface |}]
+  [%expect
+    {|
+    (Typecheck_error (Other "Class incorrectly inherited from an interface")) |}]
 ;;
 
 let%expect_test _ =
@@ -530,7 +537,7 @@ let%expect_test _ =
     }
     |};
   [%expect {|
-    Inheritance error |}]
+    (Typecheck_error (Other "Inheritance error ")) |}]
 ;;
 
 let%expect_test _ =
@@ -543,8 +550,9 @@ let%expect_test _ =
       void b();
     }
     |};
-  [%expect {|
-    Interface can only inherit from an interface |}]
+  [%expect
+    {|
+    (Typecheck_error (Other "Interface can only inherit from an interface ")) |}]
 ;;
 
 let%expect_test _ =
@@ -579,6 +587,7 @@ let%expect_test _ =
       public void b(){
       }
     } |};
-  [%expect {|
-    Class incorrectly inherited from an interface |}]
+  [%expect
+    {|
+    (Typecheck_error (Other "Class incorrectly inherited from an interface")) |}]
 ;;

@@ -9,40 +9,40 @@ open Monad.Monad_Interpreter
 
 let is_val = function
   | Value (x, _) -> pipe x
-  | _ -> fail (Other "It's not a value")
+  | _ -> fail (Interpret_error (Other "It's not a value"))
 ;;
 
 let is_init x =
   is_val x
   >>= function
   | Init x -> pipe x
-  | _ -> fail (Other "Value is not initialized")
+  | _ -> fail (Interpret_error (Other "Value is not initialized"))
 ;;
 
 let is_init_val x =
   is_val x
   >>= function
   | Init (IValue x) -> pipe x
-  | _ -> fail (Other "Value is not initialized")
+  | _ -> fail (Interpret_error (Other "Value is not initialized"))
 ;;
 
 let is_code = function
   | Code c -> pipe c
-  | _ -> fail (Other "It's not a method/constructor")
+  | _ -> fail (Interpret_error (Other "It's not a method/constructor"))
 ;;
 
 let is_int x =
   is_init_val x
   >>= function
   | VInt x -> pipe x
-  | _ -> fail Mismatch
+  | _ -> fail (Interpret_error Mismatch)
 ;;
 
 let is_bool x =
   is_init_val x
   >>= function
   | VBool x -> pipe x
-  | _ -> fail Mismatch
+  | _ -> fail (Interpret_error Mismatch)
 ;;
 
 let v_int x = VInt x
@@ -75,8 +75,9 @@ let i_access_by_point e1 e2 =
              get_meth_from_class cl n
              >>= (function
               | Some (m, b) -> pipe (Code (Method (m, b)), adr, m.m_name)
-              | None -> fail (Impossible_result "Check during typecheck"))
-           | _ -> fail (Impossible_result "Object creation checking"))
+              | None ->
+                fail (Interpret_error (Impossible_result "Check during typecheck")))
+           | _ -> fail (Interpret_error (Impossible_result "Object creation checking")))
     | Access_By_Point (e1, e2) ->
       (match e1 with
        | Exp_Name n ->
@@ -84,17 +85,17 @@ let i_access_by_point e1 e2 =
          |> pipe_name_with_fail n
          >>= (function
           | _, Init (IClass cl_adr) -> get_access_point_val cl_adr e2
-          | _ -> fail (Impossible_result "Check during typecheck"))
-       | _ -> fail (Impossible_result "Check during typecheck"))
-    | _ -> fail (Impossible_result "Check during typecheck")
+          | _ -> fail (Interpret_error (Impossible_result "Check during typecheck")))
+       | _ -> fail (Interpret_error (Impossible_result "Check during typecheck")))
+    | _ -> fail (Interpret_error (Impossible_result "Check during typecheck"))
   in
   match e1 with
   | Exp_Name n ->
     find_local_el n
     >>= (function
      | Value (Init (IClass cl_adr), _) -> get_access_point_val cl_adr e2
-     | _ -> fail (Other ""))
-  | _ -> fail (Impossible_result "Check during typecheck")
+     | _ -> fail (Interpret_error (Other "Reference must be to an object")))
+  | _ -> fail (Interpret_error (Impossible_result "Check during typecheck"))
 ;;
 
 let i_method_invoke args i_expr code i_statement =
@@ -105,13 +106,17 @@ let i_method_invoke args i_expr code i_statement =
     read_local_adr
     >>= fun adr ->
     get_args >>= fun args -> run_method args m.m_params adr m.m_type (i_statement body)
-  | Constructor _ -> fail (Other "Constructor can be used only with 'new' keyword")
+  | Constructor _ ->
+    fail (Interpret_error (Other "Constructor can be used only with 'new' keyword"))
 ;;
 
 let i_assign e1 e2 i_expr =
   let is_val_with_idx = function
     | Value (_, i) -> pipe i
-    | _ -> fail (Other "The assignment operator must assign a value to the variable")
+    | _ ->
+      fail
+        (Interpret_error
+           (Other "The assignment operator must assign a value to the variable"))
   in
   i_expr e2
   >>= is_init
@@ -131,7 +136,7 @@ let i_assign e1 e2 i_expr =
           |> function
           | Some (f, _) ->
             write_memory_obj adr { obj with mems = MapName.add n (f, Init v) obj.mems }
-          | None -> fail Mismatch))
+          | None -> fail (Interpret_error Mismatch)))
     *> find_local_el n
   | Access_By_Point (e1, e2) ->
     i_access_by_point e1 e2
@@ -144,7 +149,10 @@ let i_assign e1 e2 i_expr =
        >>= fun (f, _) ->
        write_memory_obj adr { obj with mems = MapName.add name (f, Init v) obj.mems }
        *> pipe (Value (Init v, None)))
-  | _ -> fail (Other "The assignment operator must assign a value to the variable")
+  | _ ->
+    fail
+      (Interpret_error
+         (Other "The assignment operator must assign a value to the variable"))
 ;;
 
 let i_constructor_invoke e a i_expr i_statement =
@@ -154,12 +162,12 @@ let i_constructor_invoke e a i_expr i_statement =
   >>= function
   | Constructor (c, _) ->
     get_args >>= fun args -> allocate_object c args i_expr i_statement
-  | Method _ -> fail (Other "'new' can be used only with constructor")
+  | Method _ -> fail (Interpret_error (Other "'new' can be used only with constructor"))
 ;;
 
 let i_bin_op bin_op e1 e2 i_expr =
-  let r_val op v foo =
-    lift2 (fun e1 e2 -> e1, e2) (i_expr e1 >>= foo) (i_expr e2 >>= foo)
+  let r_val op v f =
+    lift2 (fun e1 e2 -> e1, e2) (i_expr e1 >>= f) (i_expr e2 >>= f)
     >>= fun (c1, c2) -> pipe (Value (Init (IValue (v (op c1 c2))), None))
   in
   let int_r_int op = r_val op v_int is_int in
@@ -190,7 +198,7 @@ let i_bin_op bin_op e1 e2 i_expr =
 ;;
 
 let i_un_op un_op e i_expr i_statement =
-  let res foo v = i_expr e >>= foo >>= fun x -> i_const (v x) in
+  let res f v = i_expr e >>= f >>= fun x -> i_const (v x) in
   match un_op with
   | Not -> res is_bool v_bool_not
   | Minus -> res is_int v_int_minus
@@ -199,13 +207,13 @@ let i_un_op un_op e i_expr i_statement =
      | Method_invoke (e, Args args) ->
        i_constructor_invoke e args i_expr i_statement
        >>= fun adr -> pipe (Value (Init (IClass adr), None))
-     | _ -> fail (Other "'new' can be used only with constructor"))
+     | _ -> fail (Interpret_error (Other "'new' can be used only with constructor")))
 ;;
 
 let i_expr i_statement =
   let check_return = function
     | Some x -> pipe (Value (x, None))
-    | None -> fail (Other "Void cannot be used with expr")
+    | None -> fail (Interpret_error (Other "Void cannot be used with expr"))
   in
   let rec i_expr_ = function
     | Exp_Const c -> i_const c
@@ -221,7 +229,7 @@ let i_expr i_statement =
          i_access_by_point e1 e2
          >>= fun (vl, adr, _) ->
          write_cur_adr adr *> i_method_invoke args i_expr_ vl i_statement >>= check_return
-       | _ -> fail (Impossible_result "Check during typecheck"))
+       | _ -> fail (Interpret_error (Impossible_result "Check during typecheck")))
     | Access_By_Point (e1, e2) -> i_access_by_point e1 e2 >>= fun (vl, _, _) -> pipe vl
   in
   i_expr_
@@ -235,13 +243,14 @@ let i_sexpr expr i_expr i_statement =
     i_method_invoke args i_expr code i_statement
     >>= (function
      | None -> pipe ()
-     | Some _ -> fail (Other "The statement can only have a method of void type"))
+     | Some _ ->
+       fail (Interpret_error (Other "The statement can only have a method of void type")))
   | Bin_op (Assign, _, _) -> i_expr expr *> pipe ()
-  | _ -> fail Mismatch
+  | _ -> fail (Interpret_error Mismatch)
 ;;
 
-let local foo =
-  let f idx k v acc =
+let local f =
+  let helper idx k v acc =
     match v with
     | Value (v, Some (Idx cur_idx)) ->
       (match cur_idx <= idx with
@@ -252,8 +261,8 @@ let local foo =
   in
   read_local
   >>= fun (Idx i, _) ->
-  foo *> read_local
-  >>= fun (_, l) -> write_local (Idx i, MapName.fold (f i) l MapName.empty)
+  f *> read_local
+  >>= fun (_, l) -> write_local (Idx i, MapName.fold (helper i) l MapName.empty)
 ;;
 
 let bool_expr i_statement e = i_expr i_statement e >>= is_bool
@@ -304,7 +313,7 @@ let i_statement =
          i_expr i_statement_ e
          >>= (function
           | Value (v, _) -> write_new_local_el n (Value (v, Some new_idx))
-          | _ -> fail (Impossible_result "Check during typecheck"))
+          | _ -> fail (Interpret_error (Impossible_result "Check during typecheck")))
        | None -> write_new_local_el n (Value (Not_init, Some new_idx)))
     | Return e ->
       (match e with
@@ -340,11 +349,11 @@ let run_interpreter cl_with_main g_env =
   in
   let get_l_env =
     let save_constr cl =
-      let foo = function
+      let f = function
         | CConstructor (c, b) -> write_new_local_el c.c_name (Code (Constructor (c, b)))
         | _ -> pipe ()
       in
-      iter foo cl.cl_body
+      iter f cl.cl_body
       *> (write_new_local_el
             cl.cl_name
             (Code
@@ -374,9 +383,9 @@ let run_interpreter cl_with_main g_env =
        get_meth_from_class cl (Name "Main")
        >>= (function
         | Some (m, b) -> run_method [] (Params []) adr m.m_type (i_statement b)
-        | None -> fail (Impossible_result "Check during typecheck"))
-     | _ -> fail Mismatch)
-  | _ -> fail (Other "The main method must be in a class")
+        | None -> fail (Interpret_error (Impossible_result "Check during typecheck")))
+     | _ -> fail (Interpret_error Mismatch))
+  | _ -> fail (Interpret_error (Other "The main method must be in a class"))
 ;;
 
 let interpreter str =
@@ -388,8 +397,10 @@ let interpreter str =
        |> (function
         | _, Signal (Pipe x) -> Result.Ok x
         | _, IError er -> Result.Error er
-        | _, _ -> Result.Error (Impossible_result "Run_method returns pipe or error"))
-     | None, Result.Ok _ -> Result.Error (Other "Main method not found")
-     | _, Result.Error er -> Result.Error (Type_check_error er))
-  | Result.Error er -> Result.Error (Parser_error er)
+        | _, _ ->
+          Result.Error
+            (Interpret_error (Impossible_result "Run_method returns pipe or error")))
+     | None, Result.Ok _ -> Result.Error (Interpret_error (Other "Main method not found"))
+     | _, Result.Error er -> Result.Error er)
+  | Result.Error er -> Result.Error (Typecheck_error (Other er))
 ;;

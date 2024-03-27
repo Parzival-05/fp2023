@@ -9,20 +9,7 @@ module Name : sig
 end
 
 module MapName : sig
-  type key = Ast.name
-  type 'a t = 'a Map.Make(Name).t
-
-  val empty : 'a t
-  val is_empty : 'a t -> bool
-  val add : key -> 'a -> 'a t -> 'a t
-  val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
-  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-  val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-  val for_all : (key -> 'a -> bool) -> 'a t -> bool
-  val find_opt : key -> 'a t -> 'a option
-  val map : ('a -> 'b) -> 'a t -> 'b t
-  val merge : (key -> 'a option -> 'b option -> 'c option) -> 'a t -> 'b t -> 'c t
+  include Map.S with type key = Ast.name
 end
 
 type adr = Adr of int
@@ -37,19 +24,7 @@ module Adr : sig
 end
 
 module MapAdr : sig
-  type key = adr
-  type 'a t = 'a Map.Make(Adr).t
-
-  val empty : 'a t
-  val is_empty : 'a t -> bool
-  val add : key -> 'a -> 'a t -> 'a t
-  val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
-  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-  val iter : (key -> 'a -> unit) -> 'a t -> unit
-  val fold : (key -> 'a -> 'b -> 'b) -> 'a t -> 'b -> 'b
-  val for_all : (key -> 'a -> bool) -> 'a t -> bool
-  val exists : (key -> 'a -> bool) -> 'a t -> bool
-  val find_opt : key -> 'a t -> 'a option
+  include Map.S with type key = adr
 end
 
 type obj_content =

@@ -2,17 +2,30 @@
 
 (** SPDX-License-Identifier: LGPL-3.0-or-later *)
 
-type error =
+type typecheck_error =
   | Occurs_check
-  | No_variable of string
-  | Address_not_found of int
-  | Var_declared of string
   | Mismatch
   | Access_error
   | Impossible_result of string
   | Other of string
-  | Type_check_error of error
-  | Parser_error of string
+
+val pp_typecheck_error : Format.formatter -> typecheck_error -> unit
+val show_typecheck_error : typecheck_error -> string
+
+type interpreter_error =
+  | No_variable of string
+  | Address_not_found of int
+  | Var_declared of string
+  | Mismatch
+  | Impossible_result of string
+  | Other of string
+
+val pp_interpreter_error : Format.formatter -> interpreter_error -> unit
+val show_interpreter_error : interpreter_error -> string
+
+type error =
+  | Typecheck_error of typecheck_error
+  | Interpret_error of interpreter_error
 
 val pp_error : Format.formatter -> error -> unit
 val show_error : error -> string

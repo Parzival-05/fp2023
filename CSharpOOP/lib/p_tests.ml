@@ -747,8 +747,6 @@ let%expect_test _ =
   test_ast
     {|
   public interface Animal {
-    string name;
-    int age;
     void animalSound();
     void run();
   }
@@ -771,16 +769,9 @@ let%expect_test _ =
            { i_modifier = (Some Public); i_name = (Name "Animal");
              i_parent = None;
              i_body =
-             [(IField
-                 { f_modifier = None; f_type = (TVar TString);
-                   f_name = (Name "name") });
-               (IField
-                  { f_modifier = None; f_type = (TVar TInt);
-                    f_name = (Name "age") });
-               (IMethod
-                  { m_acc_modifier = None; m_poly_modifier = None;
-                    m_type = TVoid; m_name = (Name "animalSound");
-                    m_params = (Params []) });
+             [(IMethod
+                 { m_acc_modifier = None; m_poly_modifier = None; m_type = TVoid;
+                   m_name = (Name "animalSound"); m_params = (Params []) });
                (IMethod
                   { m_acc_modifier = None; m_poly_modifier = None;
                     m_type = TVoid; m_name = (Name "run"); m_params = (Params [])
