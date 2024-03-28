@@ -44,17 +44,6 @@ let eq_name_return_ctx n1 n2 m m_t =
   | false -> None
 ;;
 
-let is_public obj_name ctx = function
-  | Some Public -> return ctx
-  | Some Protected -> fail (Typecheck_error Access_error)
-  | Some Private -> fail (Typecheck_error Access_error)
-  | None ->
-    read_global_el obj_name
-    >>= (function
-     | TC_Class _ -> fail (Typecheck_error Access_error)
-     | TC_Interface _ -> return ctx)
-;;
-
 let get_class_mem name = function
   | CField (f, _) -> eq_name_return_ctx f.f_name name f (fun f -> Field f)
   | CMethod (m, _) -> eq_name_return_ctx m.m_name name m (fun m -> Method m)
@@ -66,20 +55,24 @@ let get_interface_mem name = function
 ;;
 
 let find_member_from_obj obj_name name =
-  let find_mem b name f =
-    let f n acc m =
-      match acc with
-      | None -> f n m
-      | mem -> mem
-    in
-    List.fold_left (f name) None b
-  in
+  let find_mem b name f = List.find_map (f name) b in
   let find_cl_mem b name = find_mem b name get_class_mem in
   let find_itf_mem b name = find_mem b name get_interface_mem in
   read_global_el obj_name
   >>= function
   | TC_Class { cl_body } -> find_cl_mem cl_body name |> return
   | TC_Interface ({ i_body }, _) -> find_itf_mem i_body name |> return
+;;
+
+let is_public obj_name ctx = function
+  | Some Public -> return ctx
+  | Some Protected -> fail (Typecheck_error Access_error)
+  | Some Private -> fail (Typecheck_error Access_error)
+  | None ->
+    read_global_el obj_name
+    >>= (function
+     | TC_Class _ -> fail (Typecheck_error Access_error)
+     | TC_Interface _ -> return ctx)
 ;;
 
 let find_obj_mem_with_fail n_obj n_mem =

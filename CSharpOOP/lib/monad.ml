@@ -212,8 +212,8 @@ module Monad_Interpreter = struct
   type st = State_type.St_Interpreter.st_interpreter
   type ('a, 'r) t = st -> st * ('a, 'r, error) result
 
-  let pipe : 'a -> ('a, 'r) t = fun x st -> st, Signal (Pipe x)
-  let return : 'r -> ('a, 'r) t = fun x st -> st, Signal (Return x)
+  let return : 'a -> ('a, 'r) t = fun x st -> st, Signal (Pipe x)
+  let fun_return : 'r -> ('a, 'r) t = fun x st -> st, Signal (Return x)
   let fail : 'e -> ('a, 'r) t = fun er st -> st, IError er
 
   let ( >>= ) : ('a, 'r) t -> ('a -> ('b, 'r) t) -> ('b, 'r) t =
@@ -221,7 +221,7 @@ module Monad_Interpreter = struct
     let st, x = x st in
     match x with
     | Signal (Pipe x) -> f x st
-    | Signal (Return r) -> return r st
+    | Signal (Return r) -> fun_return r st
     | IError er -> fail er st
   ;;
 
@@ -236,8 +236,8 @@ module Monad_Interpreter = struct
     fun x f st ->
     let st, x = x st in
     match x with
-    | Signal (Pipe x) -> pipe (f x) st
-    | Signal (Return r) -> return r st
+    | Signal (Pipe x) -> return (f x) st
+    | Signal (Return r) -> fun_return r st
     | IError er -> fail er st
   ;;
 
@@ -245,9 +245,9 @@ module Monad_Interpreter = struct
     fun x1 x2 st ->
     let st, x = x1 st in
     match x with
-    | Signal (Pipe x) -> pipe x st
+    | Signal (Pipe x) -> return x st
     | IError _ -> x2 st
-    | Signal (Return r) -> return r st
+    | Signal (Return r) -> fun_return r st
   ;;
 
   let ( *> ) : ('a, 'r) t -> ('b, 'r) t -> ('b, 'r) t = fun x1 x2 -> x1 >>= fun _ -> x2
@@ -256,63 +256,63 @@ module Monad_Interpreter = struct
     fun x1 x2 -> x1 >>= fun x -> x2 >>| fun _ -> x
   ;;
 
-  let read : (st, 'r) t = fun st -> pipe st st
+  let read : (st, 'r) t = fun st -> return st st
   let write : st -> (unit, 'r) t = fun new_st _ -> new_st, Signal (Pipe ())
 
   let run : ('a, 'r) t -> st * ('a, 'r, error) result =
     fun f -> f (MapName.empty, (Idx 0, MapName.empty), Adr 0, (Adr 0, MapAdr.empty))
   ;;
 
-  let lift2 f a b = a >>= fun r_a -> b >>= fun r_b -> pipe @@ f r_a r_b
+  let lift2 f a b = a >>= fun r_a -> b >>= fun r_b -> return @@ f r_a r_b
   let lift3 f a b c = lift2 f a b >>= fun f -> c >>| f
   let lift4 f a b c d = lift3 f a b c >>= fun f -> d >>| f
 
   let map f list =
-    let f' acc el = acc >>= fun acc -> f el >>= fun el -> pipe (el :: acc) in
-    List.fold_left f' (pipe []) list >>| List.rev
+    let f' acc el = acc >>= fun acc -> f el >>= fun el -> return (el :: acc) in
+    List.fold_left f' (return []) list >>| List.rev
   ;;
 
   let iter f list =
-    let f' acc el = acc *> f el *> pipe () in
-    List.fold_left f' (pipe ()) list
+    let f' acc el = acc *> f el *> return () in
+    List.fold_left f' (return ()) list
   ;;
 
   let fold_left f acc l =
-    let f' acc a = acc >>= fun acc -> f acc a >>= pipe in
-    List.fold_left f' (pipe acc) l
+    let f' acc a = acc >>= fun acc -> f acc a >>= return in
+    List.fold_left f' (return acc) l
   ;;
 
   let iter2 f l1 l2 =
-    let f' acc el1 el2 = acc *> f el1 el2 *> pipe () in
-    List.fold_left2 f' (pipe ()) l1 l2
+    let f' acc el1 el2 = acc *> f el1 el2 *> return () in
+    List.fold_left2 f' (return ()) l1 l2
   ;;
 
   (* State read/write operations *)
   let pipe_name_with_fail (Name n) = function
-    | Some x -> pipe x
+    | Some x -> return x
     | None -> fail (Interpret_error (No_variable n))
   ;;
 
   let pipe_adr_with_fail (Adr a) = function
-    | Some x -> pipe x
+    | Some x -> return x
     | None -> fail (Interpret_error (Address_not_found a))
   ;;
 
   let read_local =
     read
     >>= function
-    | _, l, _, _ -> pipe l
+    | _, l, _, _ -> return l
   ;;
 
   let read_local_el f name = read_local >>= fun (_, l) -> MapName.find_opt name l |> f
-  let read_local_el_opt name = read_local_el pipe name
+  let read_local_el_opt name = read_local_el return name
   let read_local_el name = read_local_el (pipe_name_with_fail name) name
-  let read_idx = read_local >>= fun (idx, _) -> pipe idx
+  let read_idx = read_local >>= fun (idx, _) -> return idx
 
   let read_global =
     read
     >>= function
-    | g, _, _, _ -> pipe g
+    | g, _, _, _ -> return g
   ;;
 
   let read_global_el name =
@@ -322,16 +322,16 @@ module Monad_Interpreter = struct
   let read_local_adr =
     read
     >>= function
-    | _, _, adr, _ -> pipe adr
+    | _, _, adr, _ -> return adr
   ;;
 
   let read_memory =
     read
     >>= function
-    | _, _, _, m -> pipe m
+    | _, _, _, m -> return m
   ;;
 
-  let read_cur_adr = read_memory >>= fun (a, _) -> pipe a
+  let read_cur_adr = read_memory >>= fun (a, _) -> return a
 
   let read_memory_obj adr =
     read_memory >>= fun (_, m) -> MapAdr.find_opt adr m |> pipe_adr_with_fail adr
@@ -344,7 +344,7 @@ module Monad_Interpreter = struct
   ;;
 
   let write_idx new_idx =
-    read_local >>= fun (_, l) -> write_local (new_idx, l) *> pipe new_idx
+    read_local >>= fun (_, l) -> write_local (new_idx, l) *> return new_idx
   ;;
 
   let write_local_el el_name el_ctx =
@@ -381,7 +381,7 @@ module Monad_Interpreter = struct
   ;;
 
   let write_cur_adr new_adr =
-    read_memory >>= fun (_, m) -> write_memory (new_adr, m) *> pipe new_adr
+    read_memory >>= fun (_, m) -> write_memory (new_adr, m) *> return new_adr
   ;;
 
   let write_memory_obj obj_adr obj_ctx =
@@ -394,7 +394,7 @@ module Monad_Interpreter = struct
       >>= fun obj ->
       MapName.find_opt name obj.mems
       |> function
-      | Some (_, vl) -> pipe (Value (vl, None))
+      | Some (_, vl) -> return (Value (vl, None))
       | None ->
         (match obj.p_adr with
          | Some p_adr -> find_memory_obj p_adr
@@ -403,8 +403,8 @@ module Monad_Interpreter = struct
     let find_global_el adr =
       let f acc = function
         | CMethod (m, b) when equal_name m.m_name name ->
-          pipe (Some (Code (Method (m, b))))
-        | _ -> pipe acc
+          return (Some (Code (Method (m, b))))
+        | _ -> return acc
       in
       read_memory_obj adr
       >>= fun obj ->
@@ -413,7 +413,7 @@ module Monad_Interpreter = struct
       | Int_Class cl ->
         fold_left f None cl.cl_body
         >>= (function
-         | Some vl -> pipe vl
+         | Some vl -> return vl
          | None ->
            (match name with
             | Name n -> fail (Interpret_error (No_variable n))))
@@ -442,7 +442,7 @@ module Monad_Interpreter = struct
     read_local
     >>= fun (idx, old_l) ->
     downgrade_local old_l *> read_cur_adr
-    >>= fun old_adr -> write_local_adr adr *> pipe (idx, old_l, old_adr)
+    >>= fun old_adr -> write_local_adr adr *> return (idx, old_l, old_adr)
   ;;
 
   let reset adr idx l = write_cur_adr adr *> write_local (idx, l)
@@ -458,10 +458,10 @@ module Monad_Interpreter = struct
              i_expr e
              >>= (function
               | Value (vl, _) ->
-                reset old_adr idx old_l *> pipe (MapName.add f.f_name (f, vl) acc)
+                reset old_adr idx old_l *> return (MapName.add f.f_name (f, vl) acc)
               | _ -> reset old_adr idx old_l *> fail (Interpret_error Mismatch))
-           | None -> pipe (MapName.add f.f_name (f, Not_init) acc))
-        | _ -> pipe acc
+           | None -> return (MapName.add f.f_name (f, Not_init) acc))
+        | _ -> return acc
       in
       read_global_el n
       >>= function
@@ -476,7 +476,7 @@ module Monad_Interpreter = struct
       write_memory_obj
         adr
         { mems = fields; cl_name = constr.c_name; p_adr = None; inh_adr }
-      *> pipe adr
+      *> return adr
     in
     let update_p_adr my_adr p_adr =
       read_memory_obj my_adr >>= fun obj -> write_memory_obj my_adr { obj with p_adr }
@@ -484,7 +484,7 @@ module Monad_Interpreter = struct
     let rec create_p_obj constr adr =
       read_global_el constr.c_name
       >>= function
-      | Int_Interface _ -> pipe None
+      | Int_Interface _ -> return None
       | Int_Class cl ->
         (match cl.cl_parent with
          | Some n ->
@@ -494,14 +494,14 @@ module Monad_Interpreter = struct
               create_obj_ sign adr
               >>= fun my_adr ->
               create_p_obj sign adr
-              >>= fun p_adr -> update_p_adr my_adr p_adr *> pipe (Some my_adr)
+              >>= fun p_adr -> update_p_adr my_adr p_adr *> return (Some my_adr)
             | _ -> fail (Interpret_error (Other "Can't find constructor")))
-         | None -> pipe None)
+         | None -> return None)
     in
     create_obj_ constr None
     >>= fun my_adr ->
     create_p_obj constr (Some my_adr)
-    >>= fun p_adr -> update_p_adr my_adr p_adr *> pipe my_adr
+    >>= fun p_adr -> update_p_adr my_adr p_adr *> return my_adr
   ;;
 
   let write_args_to_local args (Params params) =
@@ -515,8 +515,8 @@ module Monad_Interpreter = struct
     write_args_to_local args params *> body_f
     |>>= fun sign ->
     match sign, ret_tp with
-    | Pipe _, TVoid -> reset old_adr idx old_l *> pipe None
-    | Return x, TReturn _ -> reset old_adr idx old_l *> pipe x
+    | Pipe _, TVoid -> reset old_adr idx old_l *> return None
+    | Return x, TReturn _ -> reset old_adr idx old_l *> return x
     | _ ->
       reset old_adr idx old_l
       *> fail (Interpret_error (Other "Error in the function return value"))
@@ -537,13 +537,13 @@ module Monad_Interpreter = struct
               new_local fake_adr
               >>= fun (idx, old_l, old_adr) ->
               write_args_to_local args c.c_params *> get_args p_args
-              >>= fun p_args -> reset old_adr idx old_l *> eval p_args p_adr *> pipe ()
+              >>= fun p_args -> reset old_adr idx old_l *> eval p_args p_adr *> return ()
             | None -> fail (Interpret_error (Impossible_result "Check during typecheck")))
-         | None -> pipe ())
+         | None -> return ())
         *> run_method args c.c_params adr TVoid (i_statement b)
       | _ -> fail (Interpret_error (Impossible_result "EEECheck during typecheck"))
     in
-    eval args adr *> pipe adr
+    eval args adr *> return adr
   ;;
 
   let allocate_object constr args i_expr i_statement =

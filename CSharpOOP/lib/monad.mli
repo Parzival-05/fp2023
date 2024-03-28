@@ -201,8 +201,8 @@ module Monad_Interpreter : sig
   type st = State_type.St_Interpreter.st_interpreter
   type ('a, 'r) t = st -> st * ('a, 'r, error) result
 
-  val pipe : 'a -> ('a, 'r) t
-  val return : 'r -> ('a, 'r) t
+  val return : 'a -> ('a, 'r) t
+  val fun_return : 'r -> ('a, 'r) t
   val fail : error -> ('a, 'r) t
   val ( >>= ) : ('a, 'r) t -> ('a -> ('b, 'r) t) -> ('b, 'r) t
   val ( >>| ) : ('a, 'r) t -> ('a -> 'b) -> ('b, 'r) t

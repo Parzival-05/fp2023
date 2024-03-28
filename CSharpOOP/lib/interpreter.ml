@@ -8,40 +8,40 @@ open State_type.St_Interpreter
 open Monad.Monad_Interpreter
 
 let is_val = function
-  | Value (x, _) -> pipe x
+  | Value (x, _) -> return x
   | _ -> fail (Interpret_error (Other "It's not a value"))
 ;;
 
 let is_init x =
   is_val x
   >>= function
-  | Init x -> pipe x
+  | Init x -> return x
   | _ -> fail (Interpret_error (Other "Value is not initialized"))
 ;;
 
 let is_init_val x =
   is_val x
   >>= function
-  | Init (IValue x) -> pipe x
+  | Init (IValue x) -> return x
   | _ -> fail (Interpret_error (Other "Value is not initialized"))
 ;;
 
 let is_code = function
-  | Code c -> pipe c
+  | Code c -> return c
   | _ -> fail (Interpret_error (Other "It's not a method/constructor"))
 ;;
 
 let is_int x =
   is_init_val x
   >>= function
-  | VInt x -> pipe x
+  | VInt x -> return x
   | _ -> fail (Interpret_error Mismatch)
 ;;
 
 let is_bool x =
   is_init_val x
   >>= function
-  | VBool x -> pipe x
+  | VBool x -> return x
   | _ -> fail (Interpret_error Mismatch)
 ;;
 
@@ -49,13 +49,13 @@ let v_int x = VInt x
 let v_bool x = VBool x
 let v_bool_not x = VBool (not x)
 let v_int_minus x = VInt (-x)
-let i_const c = pipe (Value (Init (IValue c), None))
+let i_const c = return (Value (Init (IValue c), None))
 let i_name n = find_local_el n
 
 let get_meth_from_class cl name =
   let f acc = function
-    | CMethod (m, b) when equal_name m.m_name name -> pipe (Some (m, b))
-    | _ -> pipe acc
+    | CMethod (m, b) when equal_name m.m_name name -> return (Some (m, b))
+    | _ -> return acc
   in
   fold_left f None cl.cl_body
 ;;
@@ -68,13 +68,13 @@ let i_access_by_point e1 e2 =
     | Exp_Name n ->
       MapName.find_opt n obj.mems
       |> pipe_name_with_fail n
-      >>= (fun (_, vl) -> pipe (Value (vl, None), adr, n))
+      >>= (fun (_, vl) -> return (Value (vl, None), adr, n))
       <|> (read_global_el obj.cl_name
            >>= function
            | Int_Class cl ->
              get_meth_from_class cl n
              >>= (function
-              | Some (m, b) -> pipe (Code (Method (m, b)), adr, m.m_name)
+              | Some (m, b) -> return (Code (Method (m, b)), adr, m.m_name)
               | None ->
                 fail (Interpret_error (Impossible_result "Check during typecheck")))
            | _ -> fail (Interpret_error (Impossible_result "Object creation checking")))
@@ -112,7 +112,7 @@ let i_method_invoke args i_expr code i_statement =
 
 let i_assign e1 e2 i_expr =
   let is_val_with_idx = function
-    | Value (_, i) -> pipe i
+    | Value (_, i) -> return i
     | _ ->
       fail
         (Interpret_error
@@ -148,7 +148,7 @@ let i_assign e1 e2 i_expr =
        |> pipe_name_with_fail name
        >>= fun (f, _) ->
        write_memory_obj adr { obj with mems = MapName.add name (f, Init v) obj.mems }
-       *> pipe (Value (Init v, None)))
+       *> return (Value (Init v, None)))
   | _ ->
     fail
       (Interpret_error
@@ -168,7 +168,7 @@ let i_constructor_invoke e a i_expr i_statement =
 let i_bin_op bin_op e1 e2 i_expr =
   let r_val op v f =
     lift2 (fun e1 e2 -> e1, e2) (i_expr e1 >>= f) (i_expr e2 >>= f)
-    >>= fun (c1, c2) -> pipe (Value (Init (IValue (v (op c1 c2))), None))
+    >>= fun (c1, c2) -> return (Value (Init (IValue (v (op c1 c2))), None))
   in
   let int_r_int op = r_val op v_int is_int in
   let int_r_bool op = r_val op v_bool is_int in
@@ -206,13 +206,13 @@ let i_un_op un_op e i_expr i_statement =
     (match e with
      | Method_invoke (e, Args args) ->
        i_constructor_invoke e args i_expr i_statement
-       >>= fun adr -> pipe (Value (Init (IClass adr), None))
+       >>= fun adr -> return (Value (Init (IClass adr), None))
      | _ -> fail (Interpret_error (Other "'new' can be used only with constructor")))
 ;;
 
 let i_expr i_statement =
   let check_return = function
-    | Some x -> pipe (Value (x, None))
+    | Some x -> return (Value (x, None))
     | None -> fail (Interpret_error (Other "Void cannot be used with expr"))
   in
   let rec i_expr_ = function
@@ -230,7 +230,7 @@ let i_expr i_statement =
          >>= fun (vl, adr, _) ->
          write_cur_adr adr *> i_method_invoke args i_expr_ vl i_statement >>= check_return
        | _ -> fail (Interpret_error (Impossible_result "Check during typecheck")))
-    | Access_By_Point (e1, e2) -> i_access_by_point e1 e2 >>= fun (vl, _, _) -> pipe vl
+    | Access_By_Point (e1, e2) -> i_access_by_point e1 e2 >>= fun (vl, _, _) -> return vl
   in
   i_expr_
 ;;
@@ -242,10 +242,10 @@ let i_sexpr expr i_expr i_statement =
     >>= fun code ->
     i_method_invoke args i_expr code i_statement
     >>= (function
-     | None -> pipe ()
+     | None -> return ()
      | Some _ ->
        fail (Interpret_error (Other "The statement can only have a method of void type")))
-  | Bin_op (Assign, _, _) -> i_expr expr *> pipe ()
+  | Bin_op (Assign, _, _) -> i_expr expr *> return ()
   | _ -> fail (Interpret_error Mismatch)
 ;;
 
@@ -274,14 +274,14 @@ let i_if_state i_statement e b s_opt =
   | false ->
     (match s_opt with
      | Some b -> i_statement b
-     | None -> pipe ())
+     | None -> return ())
 ;;
 
 let rec iteration f1 f2 =
   f1
   >>= function
   | true -> f2 *> iteration f1 f2
-  | false -> pipe ()
+  | false -> return ()
 ;;
 
 let i_while_state i_statement e s = iteration (bool_expr i_statement e) (i_statement s)
@@ -290,14 +290,14 @@ let i_for_state i_statement init cond iter b =
   let get_init =
     match init with
     | Some init -> i_statement init
-    | None -> pipe ()
+    | None -> return ()
   in
   let get_cond =
     match cond, iter with
     | Some c, Some i -> i_expr i_statement i *> bool_expr i_statement c
     | Some c, None -> bool_expr i_statement c
-    | None, Some i -> i_expr i_statement i *> pipe true
-    | None, None -> pipe true
+    | None, Some i -> i_expr i_statement i *> return true
+    | None, None -> return true
   in
   get_init *> iteration get_cond (i_statement b)
 ;;
@@ -317,8 +317,8 @@ let i_statement =
        | None -> write_new_local_el n (Value (Not_init, Some new_idx)))
     | Return e ->
       (match e with
-       | Some e -> i_expr i_statement_ e >>= is_val >>= fun r -> return (Some r)
-       | None -> return None)
+       | Some e -> i_expr i_statement_ e >>= is_val >>= fun r -> fun_return (Some r)
+       | None -> fun_return None)
     | While (e, s) -> local (i_while_state i_statement_ e s)
     | For (init, cond, iter, b) -> local (i_for_state i_statement_ init cond iter b)
     | If (e, b, s_opt) -> local (i_if_state i_statement_ e b s_opt)
@@ -341,9 +341,9 @@ let run_interpreter cl_with_main g_env =
            >>= (function
             | Int_Interface _ ->
               write_global_el cl.cl_name (Int_Class { cl with cl_parent = None })
-            | _ -> pipe ())
-         | None -> pipe ())
-      | Interface _ -> pipe ()
+            | _ -> return ())
+         | None -> return ())
+      | Interface _ -> return ()
     in
     iter f g_env *> iter g g_env
   in
@@ -351,7 +351,7 @@ let run_interpreter cl_with_main g_env =
     let save_constr cl =
       let f = function
         | CConstructor (c, b) -> write_new_local_el c.c_name (Code (Constructor (c, b)))
-        | _ -> pipe ()
+        | _ -> return ()
       in
       iter f cl.cl_body
       *> (write_new_local_el
@@ -364,11 +364,11 @@ let run_interpreter cl_with_main g_env =
                     ; c_base = None
                     }
                   , Body [] )))
-          <|> pipe ())
+          <|> return ())
     in
     let f = function
       | Class cl -> save_constr cl
-      | Interface _ -> pipe ()
+      | Interface _ -> return ()
     in
     iter f g_env
   in
@@ -399,7 +399,7 @@ let interpreter str =
         | _, IError er -> Result.Error er
         | _, _ ->
           Result.Error
-            (Interpret_error (Impossible_result "Run_method returns pipe or error")))
+            (Interpret_error (Impossible_result "Run_method returns return or error")))
      | None, Result.Ok _ -> Result.Error (Interpret_error (Other "Main method not found"))
      | _, Result.Error er -> Result.Error er)
   | Result.Error er -> Result.Error (Typecheck_error (Other er))
