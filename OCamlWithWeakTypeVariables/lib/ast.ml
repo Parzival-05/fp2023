@@ -4,6 +4,7 @@
 
 (** name of value *)
 type name = string [@@deriving show { with_path = false }]
+
 (** base constantes
     like: 1; 43; false; ... *)
 type const =
@@ -33,6 +34,7 @@ type un_op =
   | UnMin (** unary minus *)
   | UnNot (** logic not *)
 [@@deriving show { with_path = false }]
+
 (** patterns to everything *)
 type pattern =
   | MPWildcard (** any value _ *)
@@ -136,42 +138,41 @@ and binding =
 
 type program = expr [@@deriving show { with_path = false }]
 
-val pp_program : Format.formatter -> program -> unit
 (** smart constructors *)
-module Constr : sig
-  val cint : int -> const
-  val cbool : bool -> const
-  val cunit : const
-  val badd : bin_op
-  val bsub : bin_op
-  val bmul : bin_op
-  val bdiv : bin_op
-  val bgt : bin_op
-  val bge : bin_op
-  val blt : bin_op
-  val ble : bin_op
-  val beq : bin_op
-  val bne : bin_op
-  val bcons : bin_op
-  val band : bin_op
-  val bor : bin_op
-  val unmin : un_op
-  val unnot : un_op
-  val mpwildcard : pattern
-  val mpconst : const -> pattern
-  val mpvar : name -> pattern
-  val mptuple : pattern -> pattern -> pattern list -> pattern
-  val mplist : pattern list -> pattern
-  val mphdtl : pattern -> pattern -> pattern
-  val econst : const -> expr
-  val evar : name -> expr
-  val eapply : expr -> expr -> expr
-  val ebinop : bin_op -> expr -> expr -> expr
-  val eunop : un_op -> expr -> expr
-  val elist : expr list -> expr
-  val etuple : expr -> expr -> expr list -> expr
-  val eite : expr -> expr -> expr -> expr
-  val efun : pattern * pattern list -> expr -> expr
-  val epattern : expr -> (pattern * expr) * (pattern * expr) list -> expr
-  val eletin : pattern -> rec_flag -> expr -> expr -> expr
+module Constr = struct
+  let cint i = CInt i
+  let cbool f = CBool f
+  let cunit = CUnit
+  let badd = BAdd
+  let bsub = BSub
+  let bmul = BMul
+  let bdiv = BDiv
+  let bgt = BGT
+  let bge = BGE
+  let blt = BLT
+  let ble = BLE
+  let beq = BEq
+  let bne = BNE
+  let bcons = BCons
+  let band = BAdd
+  let bor = BOr
+  let unmin = UnMin
+  let unnot = UnNot
+  let mpwildcard = MPWildcard
+  let mpconst c = MPConst c
+  let mpvar n = MPVar n
+  let mptuple m1 m2 ms = MPTuple (m1, m2, ms)
+  let mplist ms = MPList ms
+  let mphdtl head tail = MPHdTl { head; tail }
+  let econst c = EConst c
+  let evar n = EVar n
+  let eapply left right = EApply (left, right)
+  let ebinop op left right = EBinOp { op; left; right }
+  let eunop op arg = EUnOp { op; arg }
+  let elist es = EList es
+  let etuple e1 e2 es = ETuple (e1, e2, es)
+  let eite cond th el = Eite { cond; th; el }
+  let efun args expr = EFun { args; expr }
+  let epattern match_expr matches = EPattern { match_expr; matches }
+  let eletin name rec_flag value expr = ELetIn { name; rec_flag; value; expr }
 end
