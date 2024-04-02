@@ -226,7 +226,7 @@ let%expect_test _ =
 ;;
 
 let%expect_test _ =
-  let a = etuple (econst @@ cint 42) (econst @@ cunit) [] in
+  let a = etuple (econst @@ cint 42) (econst cunit) [] in
   let f =
     efun (mptuple (mpvar "a") (mpvar "b") [], []) (etuple (evar "a") (evar "b") [])
   in
@@ -237,21 +237,21 @@ let%expect_test _ =
 let%expect_test _ =
   let n = mpvar "foo" in
   let v = elist [] in
-  eletin n NoRec v (econst @@ cunit) |> check;
+  eletin n NoRec v (econst cunit) |> check;
   [%expect {| Typed |}]
 ;;
 
 let%expect_test _ =
   let n = mplist [ mpvar "a"; mpvar "b"; mpvar "c" ] in
-  let v = elist [ econst @@ cint 42 ] in
-  eletin n NoRec v (econst @@ cunit) |> check;
+  let v = elist [ econst (cint 42) ] in
+  eletin n NoRec v (econst cunit) |> check;
   [%expect {| Typed |}]
 ;;
 
 let%expect_test _ =
   let n = mplist [ mpvar "a"; mpvar "b"; mpvar "c" ] in
-  let v = elist [ econst @@ cint 42; econst @@ cbool false ] in
-  eletin n NoRec v (econst @@ cunit) |> check;
+  let v = elist [ econst (cint 42); econst (cbool false) ] in
+  eletin n NoRec v (econst cunit) |> check;
   [%expect {| Unify fail |}]
 ;;
 
@@ -294,8 +294,8 @@ let%expect_test _ =
 ;;
 
 let%expect_test _ =
-  let m = econst @@ cint 42 in
-  let p = mpconst @@ cunit, econst @@ cint 42 in
+  let m = econst (cint 42) in
+  let p = mpconst cunit, econst (cint 42) in
   let ps = [] in
   epattern m (p, ps) |> check;
   [%expect {| Unify fail |}]
@@ -310,17 +310,17 @@ let%expect_test _ =
 ;;
 
 let%expect_test _ =
-  let m = econst @@ cint 41 in
-  let p = mpconst @@ cint 42, econst @@ cunit in
-  let ps = [ mpconst @@ cunit, econst @@ cunit ] in
+  let m = econst (cint 41) in
+  let p = mpconst (cint 42), econst cunit in
+  let ps = [ mpconst cunit, econst cunit ] in
   epattern m (p, ps) |> check;
   [%expect {| Unify fail |}]
 ;;
 
 let%expect_test _ =
-  let m = econst @@ cint 41 in
-  let p = mpconst @@ cint 42, econst @@ cint 43 in
-  let ps = [ mpconst @@ cint 44, econst @@ cunit ] in
+  let m = econst (cint 41) in
+  let p = mpconst (cint 42), econst (cint 43) in
+  let ps = [ mpconst (cint 44), econst cunit ] in
   epattern m (p, ps) |> check;
   [%expect {| Unify fail |}]
 ;;

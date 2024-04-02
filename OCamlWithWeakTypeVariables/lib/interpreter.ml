@@ -154,9 +154,9 @@ let rec check_pattern pat arg m =
 
 let rec interpret_expression expr =
   match expr with
-  | EConst (CInt i) -> return @@ vint i
-  | EConst (CBool f) -> return @@ vbool f
-  | EConst CUnit -> return @@ vunit
+  | EConst (CInt i) -> return (vint i)
+  | EConst (CBool f) -> return (vbool f)
+  | EConst CUnit -> return vunit
   | EVar v -> fun c -> return (get_val v c) c
   | EFun { args; expr } -> return @@ vfun args expr []
   | ELetIn bnd -> interpret_letin bnd
