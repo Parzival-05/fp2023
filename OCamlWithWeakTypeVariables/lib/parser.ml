@@ -83,8 +83,7 @@ module Parsers = struct
   ;;
 
   let parse_string str =
-    let rec parse_str_inner str =
-      match str with
+    let rec parse_str_inner = function
       | h :: t ->
         let* c = parse_char (( = ) h) in
         let* other = parse_str_inner t in
