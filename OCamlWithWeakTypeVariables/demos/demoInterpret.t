@@ -7,7 +7,7 @@
   3
 
   $ ./demoInterpret.exe <<- EOF
-  > let rec len l = 
+  > let rec len l =
   >   match l with
   >   | [] -> 0
   >   | _ :: tl -> (len tl) + 1
@@ -16,8 +16,8 @@
   5
 
   $ ./demoInterpret.exe <<- EOF
-  > let sum l = 
-  >   let rec helper acc l = 
+  > let sum l =
+  >   let rec helper acc l =
   >     match l with
   >     | [] -> acc
   >     | hd :: tl -> helper (acc + hd) tl
@@ -38,8 +38,8 @@
   42
 
   $ ./demoInterpret.exe <<- EOF
-  > let fac n = 
-  >   let rec helper n acc = 
+  > let fac n =
+  >   let rec helper n acc =
   >     if n <= 1 then
   >       acc
   >     else
@@ -51,9 +51,9 @@
   120
 
   $ ./demoInterpret.exe <<- EOF
-  > let fib n = 
-  >   let rec helper a b n = 
-  >     if n > 0 then 
+  > let fib n =
+  >   let rec helper a b n =
+  >     if n > 0 then
   >       helper b (a + b) (n - 1)
   >     else
   >       a
@@ -62,3 +62,13 @@
   > in
   > fib 5
   5
+
+  $ ./demoInterpret.exe <<- EOF
+  > let fib n [x; y] =  n+x+y in
+  > fib 5 [1;2]
+  8
+CPS Fibonacci
+  $ ./demoInterpret.exe <<- EOF
+  > let rec fibk n k = if n<2 then k n else fibk (n-1) (fun a -> fibk (n-2) (fun b -> k (a+b)) in
+  > fib 5 (fun y -> y)
+
