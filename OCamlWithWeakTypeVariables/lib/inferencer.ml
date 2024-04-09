@@ -54,7 +54,7 @@ module Type = struct
       | TyArrow (left, right) -> helper (( || ) (helper f left)) right
       | TyTuple (t1, t2, ts) ->
         let ts = t1 :: t2 :: ts in
-        false |> List.fold_left (fun f t -> ( || ) (helper f t)) f ts
+        List.fold_left (fun f t -> ( || ) (helper f t)) f ts false
       | TyList t -> helper f t
       | TyGround _ -> false
     in
@@ -438,8 +438,7 @@ let rec infer_expr =
       return (fin_sb, Subst.apply fin_sb t)
     | ELetIn { name; rec_flag; value; expr } ->
       let* names, t =
-        name
-        |> Patterns.pattern_infer
+        Patterns.pattern_infer name
         >>| function
         | None, t -> [], t
         | Some names, t -> names, t

@@ -71,4 +71,5 @@ CPS Fibonacci
   $ ./demoInterpret.exe <<- EOF
   > let rec fibk n k = if n<2 then k n else fibk (n-1) (fun a -> fibk (n-2) (fun b -> k (a+b)) in
   > fib 5 (fun y -> y)
+  Char not found
 

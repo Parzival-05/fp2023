@@ -8,8 +8,6 @@ open Ast
 (* Parser tests *)
 open Parser
 
-let s = In_channel.input_all Stdlib.stdin
-
 let test_parse s =
   match parse s with
   | Result.Ok ast -> Format.printf "%a\n%!" Ast.pp_program ast

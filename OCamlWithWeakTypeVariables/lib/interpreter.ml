@@ -102,7 +102,7 @@ module Interpreter = struct
   let get_val name ctx =
     match SMap.find_opt name ctx.bindings with
     | Some e -> e
-    | None -> Constr.verr @@ Format.sprintf "\"%s\" not bound" name
+    | None -> Constr.verr @@ Format.sprintf "\"%S\" not bound" name
   ;;
 end
 
@@ -117,8 +117,8 @@ let zip l1 l2 =
 
 let equals a c =
   match a, c with
-  | CInt i, Int j when i = j -> true
-  | CBool b, Bool d when b = d -> true
+  | CInt i, Int j -> i = j
+  | CBool b, Bool d -> b = d
   | CUnit, Unit -> true
   | _ -> false
 ;;
@@ -169,8 +169,7 @@ let rec interpret_expression expr =
   | EPattern { match_expr; matches } -> interpret_match match_expr matches
 
 and interpret_ite cond th el =
-  cond
-  |> interpret_expression
+  interpret_expression cond
   >>= function
   | Bool b when b -> interpret_expression th
   | Bool _ -> interpret_expression el
@@ -210,8 +209,7 @@ and interpret_letin bnd ctx =
   | None -> return (verr "Can't match let in right and left hand side") ctx
 
 and interpret_tuple exprs ctx =
-  let evaluated = List.map (fun e -> interpret_expression e ctx) exprs in
-  let evaluated = List.map fst evaluated in
+  let evaluated = List.map (fun e -> interpret_expression e ctx |> fst) exprs in
   return (vtuple evaluated) ctx
 
 and interpret_list exprs ctx =
